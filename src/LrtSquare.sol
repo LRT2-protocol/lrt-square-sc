@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-import "@openzeppelin-upgradeable/contracts/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
 import "@openzeppelin-upgradeable/contracts/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin-upgradeable/contracts/access/OwnableUpgradeable.sol";
+
+import "src/interfaces/IPriceProvider.sol";
 
 /*
     AVSs pay out rewards to stakers in their ERC20 tokens.
@@ -23,20 +25,21 @@ import "@openzeppelin-upgradeable/contracts/access/OwnableUpgradeable.sol";
     while larger holders have the option to redeem and potentially arbitrage.
 */
 
-contract LrtSquare is Initializable, ERC20VotesUpgradeable, UUPSUpgradeable, OwnableUpgradeable {
+contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, OwnableUpgradeable {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
     struct TokenInfo {
         bool registered;
         bool whitelisted;
+        IPriceProvider priceProvider;
     }
 
     mapping(address => TokenInfo) public tokenInfos;
     address[] public tokens;
 
     event TokenRegistered(address token);
-    event TokenWhitelistUpdated(address token, bool whitelisted);
+    event TokenUpdated(address token, bool whitelisted, IPriceProvider priceProvider);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -46,7 +49,7 @@ contract LrtSquare is Initializable, ERC20VotesUpgradeable, UUPSUpgradeable, Own
     function initialize(string memory name, string memory symbol) public initializer {
         __ERC20_init(name, symbol);
         __ERC20Permit_init(name);
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
     }
 
@@ -54,38 +57,50 @@ contract LrtSquare is Initializable, ERC20VotesUpgradeable, UUPSUpgradeable, Own
         _mint(to, shareToMint);
     }
 
-    function registerToken(address _token, bool _whitelisted) external onlyOwner {
-        require(!tokenInfos[_token].registered, "TOKEN_ALREADY_REGISTERED");
+    function registerToken(address _token, IPriceProvider _priceProvider) external onlyOwner {
+        require(!isTokenRegistered(_token), "TOKEN_ALREADY_REGISTERED");
 
-        tokenInfos[_token] = TokenInfo({registered: true, whitelisted: _whitelisted});
+        tokenInfos[_token] = TokenInfo({registered: true, whitelisted: true, priceProvider: _priceProvider});
+        tokens.push(_token);
         
         emit TokenRegistered(_token);
-        emit TokenWhitelistUpdated(_token, _whitelisted);
+        emit TokenUpdated(_token, true, _priceProvider);
     }
 
-    function updateWhitelist(address token) external onlyOwner {
-        require(!isTokenRegistered[token], "TOKEN_ALREADY_REGISTERED");
+    function updateWhitelist(address _token, bool _whitelist) external onlyOwner {
+        require(isTokenRegistered(_token), "TOKEN_NOT_REGISTERED");
 
-        isTokenRegistered[token] = true;
-        tokens.push(token);
+        tokenInfos[_token].whitelisted = _whitelist;
+
+        emit TokenUpdated(_token, _whitelist, tokenInfos[_token].priceProvider);
+    }
+
+    function updatePriceProvider(address _token, IPriceProvider _priceProvider) external onlyOwner {
+        require(isTokenRegistered(_token), "TOKEN_NOT_REGISTERED");
+
+        tokenInfos[_token].priceProvider = _priceProvider;
+
+        emit TokenUpdated(_token, tokenInfos[_token].whitelisted, _priceProvider);
     }
 
     /// @notice Deposit rewards to the contract and mint share tokens to the recipient.
-    /// @param _tokens addresses of ERC20 tokens to deposit
+    /// @param tokens addresses of ERC20 tokens to deposit
     /// @param amounts amounts of tokens to deposit
-    /// @param shareToMint amount of share token (= LRT^2 token) to mint
-    /// @param recipientForMintedShare recipient of the minted share token
-    function distributeRewards(address[] memory _tokens, uint256[] memory amounts, uint256 shareToMint, address recipientForMintedShare) external onlyOwner {
-        require(_tokens.length == amounts.length, "INVALID_INPUT");
+    /// @param receiver recipient of the minted share token
+    function deposit(address[] memory tokens, uint256[] memory amounts, address receiver) external onlyOwner {
+        require(tokens.length == amounts.length, "INVALID_INPUT");
+        require(receiver != address(0), "INVALID_RECIPIENT");
 
-        for (uint256 i = 0; i < _tokens.length; i++) {
-            require(isTokenRegistered[_tokens[i]], "TOKEN_NOT_REGISTERED");
+        bool initial_deposit = (totalSupply() == 0);
+        uint256 before_VaultTokenValue = getVaultTokenValuesInUsd(1 * 10 ** decimals());
 
-            IERC20(_tokens[i]).safeTransferFrom(msg.sender, address(this), amounts[i]);
-        }
+        uint256 shareToMint = previewDeposit(tokens, amounts);
+        _deposit(tokens, amounts, shareToMint, receiver);
 
-        if (recipientForMintedShare != address(0)) {
-            _mint(recipientForMintedShare, shareToMint);
+        uint256 after_VaultTokenValue = getVaultTokenValuesInUsd(1 * 10 ** decimals());
+
+        if (!initial_deposit) {
+            require(before_VaultTokenValue == after_VaultTokenValue, "VAULT_TOKEN_VALUE_CHANGED");
         }
     }
 
@@ -103,33 +118,38 @@ contract LrtSquare is Initializable, ERC20VotesUpgradeable, UUPSUpgradeable, Own
         }
     }
 
-    function assetOf(address user, address token) external view returns (uint256) {
-        return assetForVaultShares(balanceOf(user), token);
+    function previewDeposit(address[] memory _tokens, uint256[] memory amounts) public view returns (uint256) {
+        uint256 rewardsValueInUsd = getAvsTokenValuesInUsd(_tokens, amounts);
+        return _convertToShares(rewardsValueInUsd, Math.Rounding.Floor);
+    }
+
+    function assetOf(address user, address avsToken) external view returns (uint256) {
+        return assetForVaultShares(balanceOf(user), avsToken);
     }
 
     function assetsOf(address user) external view returns (address[] memory, uint256[] memory) {
         return assetsForVaultShares(balanceOf(user));
     }
 
-    function assetForVaultShares(uint256 vaultShares, address rewardsToken) public view returns (uint256) {
-        require(isTokenRegistered[rewardsToken], "TOKEN_NOT_REGISTERED");
+    function assetForVaultShares(uint256 vaultShares, address avsToken) public view returns (uint256) {
+        require(isTokenRegistered(avsToken), "TOKEN_NOT_REGISTERED");
         require(totalSupply() > 0, "ZERO_SUPPLY");
 
-        return _convertToAssetAmount(rewardsToken, vaultShares, Math.Rounding.Zero);
+        return _convertToAssetAmount(avsToken, vaultShares, Math.Rounding.Floor);
     }
 
-    function assetsForVaultShares(uint256 share) public view returns (address[] memory, uint256[] memory) {
+    function assetsForVaultShares(uint256 vaultShare) public view returns (address[] memory, uint256[] memory) {
         require(totalSupply() > 0, "ZERO_SUPPLY");
 
         address[] memory assets = new address[](tokens.length);
         uint256[] memory assetAmounts = new uint256[](tokens.length);
         uint256 cnt = 0;
         for (uint256 i = 0; i < tokens.length; i++) {
-            if (!isTokenRegistered[tokens[i]]) {
+            if (!isTokenRegistered(tokens[i])) {
                 continue;
             }
             assets[cnt] = tokens[i];
-            assetAmounts[cnt] = assetForVaultShares(share, tokens[i]);
+            assetAmounts[cnt] = assetForVaultShares(vaultShare, tokens[i]);
             cnt++;
         }
 
@@ -141,14 +161,12 @@ contract LrtSquare is Initializable, ERC20VotesUpgradeable, UUPSUpgradeable, Own
         return (assets, assetAmounts);
     }
 
-    function totalAssets() external view returns (address[] memory, uint256[] memory) {
-        require(totalSupply() > 0, "ZERO_SUPPLY");
-
+    function totalAssets() public view returns (address[] memory, uint256[] memory) {
         address[] memory assets = new address[](tokens.length);
         uint256[] memory assetAmounts = new uint256[](tokens.length);
         uint256 cnt = 0;
         for (uint256 i = 0; i < tokens.length; i++) {
-            if (!isTokenRegistered[tokens[i]]) {
+            if (!isTokenWhitelisted(tokens[i])) {
                 continue;
             }
             assets[cnt] = tokens[i];
@@ -164,12 +182,69 @@ contract LrtSquare is Initializable, ERC20VotesUpgradeable, UUPSUpgradeable, Own
         return (assets, assetAmounts);
     }
 
+    function totalAssetsValueInUsd() external view returns (uint256) {
+        (address[] memory assets, uint256[] memory assetAmounts) = totalAssets();
+        
+        uint256 totalValue = 0;
+        for (uint256 i = 0; i < assets.length; i++) {
+            totalValue += assetAmounts[i] * tokenInfos[assets[i]].priceProvider.getPriceInUsd() / 10 ** ERC20(assets[i]).decimals();
+        }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+        return totalValue;
+    }
 
-    /**
-     * @dev Internal conversion function (from shares to assets) with support for rounding direction.
-     */
+    function isTokenRegistered(address token) public view returns (bool) {
+        return tokenInfos[token].registered;
+    }
+
+    function isTokenWhitelisted(address token) public view returns (bool) {
+        return tokenInfos[token].whitelisted;
+    }
+
+    function getAvsTokenValuesInUsd(address[] memory _tokens, uint256[] memory amounts) public view returns (uint256) {
+        uint256 total_usd = 0;
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            require(isTokenRegistered(_tokens[i]), "TOKEN_NOT_REGISTERED");
+            require(isTokenWhitelisted(_tokens[i]), "TOKEN_NOT_WHITELISTED");
+            TokenInfo memory tokenInfo = tokenInfos[_tokens[i]];
+            
+            uint256 tokenValueInUSDC = tokenInfo.priceProvider.getPriceInUsd();
+            total_usd += amounts[i] * tokenValueInUSDC / 10 ** ERC20(_tokens[i]).decimals();
+        }
+        return total_usd;
+    }
+
+    function getVaultTokenValuesInUsd(uint256 vaultTokenShares) public view returns (uint256) {
+        uint256 totalSupply = totalSupply();
+        if (totalSupply == 0) {
+            return 0;
+        }
+
+        (address[] memory assets, uint256[] memory assetAmounts) = totalAssets();
+        uint256 totalValue = getAvsTokenValuesInUsd(assets, assetAmounts);
+        return totalValue * vaultTokenShares / totalSupply;
+    }
+
+
+    /// @notice Deposit rewards to the contract and mint share tokens to the recipient.
+    /// @param _tokens addresses of ERC20 tokens to deposit
+    /// @param amounts amounts of tokens to deposit
+    /// @param shareToMint amount of share token (= LRT^2 token) to mint
+    /// @param recipientForMintedShare recipient of the minted share token
+    function _deposit(address[] memory _tokens, uint256[] memory amounts, uint256 shareToMint, address recipientForMintedShare) internal {
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            require(isTokenRegistered(_tokens[i]), "TOKEN_NOT_REGISTERED");
+
+            IERC20(_tokens[i]).safeTransferFrom(msg.sender, address(this), amounts[i]);
+        }
+
+        _mint(recipientForMintedShare, shareToMint);
+    }
+
+    function _convertToShares(uint256 valueInUsd, Math.Rounding rounding) public view virtual returns (uint256) {
+        return valueInUsd.mulDiv(totalSupply() + 10 ** _decimalsOffset(), getVaultTokenValuesInUsd(totalSupply()) + 1, rounding);
+    }
+
     function _convertToAssetAmount(address assetToken, uint256 vaultShares, Math.Rounding rounding) internal view virtual returns (uint256) {
         return vaultShares.mulDiv(IERC20(assetToken).balanceOf(address(this)) + 1, totalSupply() + 10 ** _decimalsOffset(), rounding);
     }
@@ -177,4 +252,6 @@ contract LrtSquare is Initializable, ERC20VotesUpgradeable, UUPSUpgradeable, Own
     function _decimalsOffset() internal view virtual returns (uint8) {
         return 0;
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

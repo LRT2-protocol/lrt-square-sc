@@ -6,14 +6,16 @@ import "forge-std/Test.sol";
 import "forge-std/console2.sol";
 import "forge-std/console.sol";
 
-import "@openzeppelin-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import "../src/LrtSquare.sol";
-import "../src/UUPSProxy.sol";
+import "src/LrtSquare.sol";
+import "src/UUPSProxy.sol";
+import "src/interfaces/IPriceProvider.sol";
+import "src/PriceProvider.sol";
 
-contract ERC20Mintable is ERC20Upgradeable {
-    function initialize(string memory name, string memory symbol) public {
-        super.initialize(name, symbol);
+contract ERC20Mintable is ERC20 {
+
+    constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {
     }
 
     function mint(address to, uint256 amount) public {
@@ -25,7 +27,8 @@ contract LrtSquareTest is Test {
     
     LrtSquare public lrtSquare;
 
-    ERC20PresetMinterPauser[] public tokens;
+    ERC20Mintable[] public tokens;
+    IPriceProvider[] public priceProviders;
 
     address public owner = vm.addr(1);
     address public alice = vm.addr(2);
@@ -38,9 +41,13 @@ contract LrtSquareTest is Test {
         lrtSquare = LrtSquare(address(new UUPSProxy(address(new LrtSquare()), "")));
         lrtSquare.initialize("LrtSquare", "LRT");
 
-        tokens.push(new ERC20PresetMinterPauser("Token1", "TK1"));
-        tokens.push(new ERC20PresetMinterPauser("Token2", "TK2"));
-        tokens.push(new ERC20PresetMinterPauser("Token3", "TK3"));
+        tokens.push(new ERC20Mintable("Token1", "TK1"));
+        tokens.push(new ERC20Mintable("Token2", "TK2"));
+        tokens.push(new ERC20Mintable("Token3", "TK3"));
+
+        priceProviders.push(IPriceProvider(address(new PriceProvider())));
+        priceProviders.push(IPriceProvider(address(new PriceProvider())));
+        priceProviders.push(IPriceProvider(address(new PriceProvider())));
 
         tokens[0].mint(owner, 100 ether);
         tokens[1].mint(owner, 100 ether);
@@ -50,7 +57,8 @@ contract LrtSquareTest is Test {
     }
 
     function test_mint() public {
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert();
+        vm.prank(alice); // alice == 0x2B5AD5c4795c026514f8317c7a215E218DcCD6cF
         lrtSquare.mint(alice, 100 ether);
 
         vm.startPrank(owner);
@@ -61,22 +69,22 @@ contract LrtSquareTest is Test {
     }
 
     function test_registerToken() public {
-        vm.expectRevert("Ownable: caller is not the owner");
-        lrtSquare.registerToken(address(tokens[0]));
+        vm.expectRevert();
+        lrtSquare.registerToken(address(tokens[0]), priceProviders[0]);
 
         vm.expectRevert("TOKEN_NOT_REGISTERED");
         assertEq(lrtSquare.assetOf(alice, address(tokens[0])), 0);
 
         vm.startPrank(owner);
         assertEq(lrtSquare.isTokenRegistered(address(tokens[0])), false);
-        lrtSquare.registerToken(address(tokens[0]));
+        lrtSquare.registerToken(address(tokens[0]), priceProviders[0]);
         assertEq(lrtSquare.isTokenRegistered(address(tokens[0])), true);
         vm.stopPrank();
     }
 
     function test_distributeRewards_to_alice() public {
         vm.prank(owner);
-        ERC20PresetMinterPauser(address(tokens[0])).approve(address(lrtSquare), 10 ether);
+        ERC20Mintable(address(tokens[0])).approve(address(lrtSquare), 10 ether);
 
         address[] memory _tokens = new address[](1);
         uint256[] memory _amounts = new uint256[](1);
@@ -85,20 +93,20 @@ contract LrtSquareTest is Test {
         uint256 share = 1 ether;
         address recipient = alice;
 
-        vm.expectRevert("Ownable: caller is not the owner");
-        lrtSquare.distributeRewards(_tokens, _amounts, share, recipient);
+        vm.expectRevert();
+        lrtSquare.deposit(_tokens, _amounts, recipient);
 
         vm.startPrank(owner);
 
         // Fail if not registered
         vm.expectRevert("TOKEN_NOT_REGISTERED");
-        lrtSquare.distributeRewards(_tokens, _amounts, share, recipient);
+        lrtSquare.deposit(_tokens, _amounts, recipient);
     
-        lrtSquare.registerToken(address(tokens[0]));
+        lrtSquare.registerToken(address(tokens[0]), priceProviders[0]);
 
         assertEq(lrtSquare.balanceOf(alice), 0);
 
-        lrtSquare.distributeRewards(_tokens, _amounts, share, recipient);
+        lrtSquare.deposit(_tokens, _amounts, recipient);
 
         assertEq(lrtSquare.balanceOf(alice), 1 ether);
         assertApproxEqAbs(lrtSquare.assetOf(alice, address(tokens[0])), 10 ether, 10);
@@ -116,11 +124,16 @@ contract LrtSquareTest is Test {
         address merkleDistributor = vm.addr(1007);
 
         vm.startPrank(owner);
-        lrtSquare.registerToken(address(tokens[0]));
-        lrtSquare.registerToken(address(tokens[1]));
+        lrtSquare.registerToken(address(tokens[0]), priceProviders[0]);
+        lrtSquare.registerToken(address(tokens[1]), priceProviders[1]);
+        priceProviders[0].setPrice(200 * 1e6);
+        priceProviders[1].setPrice(20 * 1e6);
+
+        assertApproxEqAbs(lrtSquare.totalAssetsValueInUsd(), 0, 0);
 
         // 1. At week-0, ether.fi receives an AVS reward 'tokens[0]'
         // Assume that only alice was holding 1 weETH
+        // tokens[0] rewards amount is 100 ether
         // 
         // Perform `distributeRewards`
         // - ether.fi sends the 'tokens[o]' rewards 100 ether to the LrtSquare vault
@@ -132,12 +145,17 @@ contract LrtSquareTest is Test {
             uint256[] memory amounts = new uint256[](1);
             assets[0] = address(tokens[0]);
             amounts[0] = 100 ether;
-            lrtSquare.distributeRewards(assets, amounts, 1 ether, merkleDistributor);
+            assertApproxEqAbs(lrtSquare.previewDeposit(assets, amounts), 20000 * 1e6, 1); // 100 * 200 = 20000 USDC worth
+            lrtSquare.deposit(assets, amounts, merkleDistributor);
             // 1 ether LRT^2 == {tokens[0]: 100 ether}
         }
 
+        assertApproxEqAbs(lrtSquare.totalAssetsValueInUsd(), 100 * 200 * 1e6, 1);
+        assertEq(lrtSquare.totalSupply(), 100 * priceProviders[0].getPriceInUsd()); // initial mint
+
         // 2. At week-1, ether.fi receives rewards
         // Assume that {alice, bob} were holding 1 weETH
+        // tokens[0] rewards amount is 200 ether
         tokens[0].mint(owner, 200 ether);
         tokens[0].approve(address(lrtSquare), 200 ether);
         {
@@ -145,14 +163,18 @@ contract LrtSquareTest is Test {
             uint256[] memory amounts = new uint256[](1);
             assets[0] = address(tokens[0]);
             amounts[0] = 200 ether;
-            lrtSquare.distributeRewards(assets, amounts, 2 ether, merkleDistributor);
+
+            assertApproxEqAbs(lrtSquare.previewDeposit(assets, amounts), 40000 * 1e6, 1); // 200 * 200 = 40000 USDC worth
+            lrtSquare.deposit(assets, amounts, merkleDistributor);
             // (1 + 2) ether LRT^2 == {tokens[0]: 100 + 200 ether} 
             // --> 1 ether LRT^2 == {tokens[0]: 100 ether}
         }
 
+        assertApproxEqAbs(lrtSquare.totalAssetsValueInUsd(), (100 + 200) * 200 * 1e6, 1);
+
         // 3. At week-3, ether.fi receives rewards
         // Assume that {alice, bob} were holding 1 weETH
-        // but AVS rewards amount has decreased to 100 ether
+        // tokens[0] rewards amount is 100 ether
         tokens[0].mint(owner, 100 ether);
         tokens[0].approve(address(lrtSquare), 100 ether);
         {
@@ -161,7 +183,7 @@ contract LrtSquareTest is Test {
             assets[0] = address(tokens[0]);
             amounts[0] = 100 ether;
 
-            // lrtSquare.distributeRewards(assets, amounts, 2 ether, merkleDistributor);
+            // lrtSquare.deposit(assets, amounts, 2 ether, merkleDistributor);
             /// @dev this will be unfair distribution to the existing holders of LRT^2
             // (1 + 2 + 2) ether LRT^2 == {tokens[0]: 100 + 200 + 100 ether}
             // After 'distributeRewards'. the value of LRT^2 token has decreased
@@ -172,11 +194,13 @@ contract LrtSquareTest is Test {
             // What should be 'x' to make it fair distribution; keep the current LRT^2 token's value the same after 'distributeRewards'
             // 100 ether = (100 + 200 + 100) ether / (1 + 2 + x)
             // => x = (100 + 200 + 100) / 100 - (1 + 2) = 1
-            uint256 x = 1 ether;
-            lrtSquare.distributeRewards(assets, amounts, x, merkleDistributor);
+            assertApproxEqAbs(lrtSquare.previewDeposit(assets, amounts), 20000 * 1e6, 1); // 100 * 200 = 20000 USDC worth
+            lrtSquare.deposit(assets, amounts, merkleDistributor);
             // (1 + 2 + 1) ether LRT^2 == {tokens[0]: 100 + 200 + 100 ether}
             // --> 1 ether LRT^2 == {tokens[0]: 100 ether}
         }
+
+        assertApproxEqAbs(lrtSquare.totalAssetsValueInUsd(), (100 + 200 + 100) * 200 * 1e6, 1);
 
         // 4. At week-3, ether.fi receives rewards from one more AVS
         // Assume that {alice, bob} were holding 1 weETH
@@ -205,48 +229,14 @@ contract LrtSquareTest is Test {
             // 
 
             // To maintain the value of each share, new shares equivalent to the proportion of the increase must be minted.
-            uint256 new_lrtSquare_tokens_to_mint = calculateVaultShareToMintForRewardsToDistribute(assets, amounts);
-
             // Execute 'distributeRewards' operation
-            uint256 beforeTokenVaultValue = calculateVaultTokenValue(1 ether);
-            lrtSquare.distributeRewards(assets, amounts, new_lrtSquare_tokens_to_mint, merkleDistributor);
-            assertApproxEqAbs(beforeTokenVaultValue, calculateVaultTokenValue(1 ether), 1);
+            assertApproxEqAbs(lrtSquare.previewDeposit(assets, amounts), 20200 * 1e6, 1); // 100 * 200 + 10 * 20 = 20200 USDC worth
+            lrtSquare.deposit(assets, amounts, merkleDistributor);
         }
+
+        assertApproxEqAbs(lrtSquare.totalAssetsValueInUsd(), (100 + 200 + 100 + 100) * 200 * 1e6 + 10 * 20 * 1e6, 1);
+        lrtSquare.totalSupply();
         vm.stopPrank();
-    }
-
-    function calculateVaultShareToMintForRewardsToDistribute(address[] memory _tokens, uint256[] memory amounts) internal view returns (uint256) {
-        uint256 total_new_rewards_in_usdc = calculateTokensValueInUSDC(_tokens, amounts);
-        uint256 total_current_lrtSquare_value_in_usdc = calculateVaultTokenValue(lrtSquare.totalSupply());
-        uint256 total_lrtSquare_supply = lrtSquare.totalSupply();
-        return (total_new_rewards_in_usdc * total_lrtSquare_supply) / total_current_lrtSquare_value_in_usdc;
-    }
-
-    function calculateVaultTokenValue(uint256 shares) internal view returns (uint256) {
-        (address[] memory assets, uint256[] memory assetAmounts) = lrtSquare.totalAssets();
-        uint256 totalValue = calculateTokensValueInUSDC(assets, assetAmounts);
-        uint256 totalSupply = lrtSquare.totalSupply();
-        return totalValue * shares / totalSupply;
-    }
-
-    function calculateTokensValueInUSDC(address[] memory _tokens, uint256[] memory amounts) internal view returns (uint256) {
-        uint256 total_new_rewards_in_usdc = 0;
-        for (uint256 i = 0; i < _tokens.length; i++) {
-            uint256 tokenValueInUSDC = queryAvsTokenValue(_tokens[i]);
-            total_new_rewards_in_usdc += amounts[i] * tokenValueInUSDC / 10 ** ERC20(_tokens[i]).decimals();
-        }
-        return total_new_rewards_in_usdc;
-    }
-
-    // Utility function to get current USD value of a token, assuming integration with an oracle or other price feed
-    function queryAvsTokenValue(address token) internal view returns (uint256) {
-        // Placeholder for an actual oracle call
-        if (token == address(tokens[0])) {
-            return 200; // Assume each token is worth 200 USDC
-        } else if (token == address(tokens[1])) {
-            return 20;  // Assume each token is worth 20 USDC
-        }
-        return 0;
     }
 
 }
