@@ -49,6 +49,10 @@ contract LrtSquareTest is Test {
         priceProviders.push(IPriceProvider(address(new PriceProvider())));
         priceProviders.push(IPriceProvider(address(new PriceProvider())));
 
+        priceProviders[0].setPrice(100 * 1e6); // 100 USD per 1 fullt decimal unit amount
+        priceProviders[1].setPrice(10 * 1e6); // 10 USD per 1 fullt decimal unit amount
+        priceProviders[2].setPrice(1 * 1e6); // 1 USD per 1 fullt decimal unit amount
+
         tokens[0].mint(owner, 100 ether);
         tokens[1].mint(owner, 100 ether);
         tokens[2].mint(owner, 100 ether);
@@ -90,7 +94,6 @@ contract LrtSquareTest is Test {
         uint256[] memory _amounts = new uint256[](1);
         _tokens[0] = address(tokens[0]);
         _amounts[0] = 10 ether;
-        uint256 share = 1 ether;
         address recipient = alice;
 
         vm.expectRevert();
@@ -106,10 +109,12 @@ contract LrtSquareTest is Test {
 
         assertEq(lrtSquare.balanceOf(alice), 0);
 
+        // deposit 10 * 100 USD worth of tokens[0]
+        // mint 1000 * 1e6 wei LRT^2 tokens
         lrtSquare.deposit(_tokens, _amounts, recipient);
 
-        assertEq(lrtSquare.balanceOf(alice), 1 ether);
-        assertApproxEqAbs(lrtSquare.assetOf(alice, address(tokens[0])), 10 ether, 10);
+        assertApproxEqAbs(lrtSquare.balanceOf(alice), 1000 * 1e6, 10 gwei);
+        assertApproxEqAbs(lrtSquare.assetOf(alice, address(tokens[0])), 10 ether, 10 gwei);
         vm.stopPrank();
 
         (address[] memory assets, uint256[] memory assetAmounts) = lrtSquare.totalAssets();
