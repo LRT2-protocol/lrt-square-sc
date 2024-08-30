@@ -62,7 +62,7 @@ contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, Ow
 
         tokenInfos[_token] = TokenInfo({registered: true, whitelisted: true, priceProvider: _priceProvider});
         tokens.push(_token);
-        
+
         emit TokenRegistered(_token);
         emit TokenUpdated(_token, true, _priceProvider);
     }
@@ -173,7 +173,7 @@ contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, Ow
             assetAmounts[cnt] = IERC20(tokens[i]).balanceOf(address(this));
             cnt++;
         }
-        
+
         assembly {
             mstore(assets, cnt)
             mstore(assetAmounts, cnt)
@@ -184,10 +184,11 @@ contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, Ow
 
     function totalAssetsValueInUsd() external view returns (uint256) {
         (address[] memory assets, uint256[] memory assetAmounts) = totalAssets();
-        
+
         uint256 totalValue = 0;
         for (uint256 i = 0; i < assets.length; i++) {
-            totalValue += assetAmounts[i] * tokenInfos[assets[i]].priceProvider.getPriceInUsd() / 10 ** ERC20(assets[i]).decimals();
+            totalValue += assetAmounts[i] * tokenInfos[assets[i]].priceProvider.getPriceInUsd()
+                / 10 ** ERC20(assets[i]).decimals();
         }
 
         return totalValue;
@@ -207,7 +208,7 @@ contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, Ow
             require(isTokenRegistered(_tokens[i]), "TOKEN_NOT_REGISTERED");
             require(isTokenWhitelisted(_tokens[i]), "TOKEN_NOT_WHITELISTED");
             TokenInfo memory tokenInfo = tokenInfos[_tokens[i]];
-            
+
             uint256 tokenValueInUSDC = tokenInfo.priceProvider.getPriceInUsd();
             total_usd += amounts[i] * tokenValueInUSDC / 10 ** ERC20(_tokens[i]).decimals();
         }
@@ -225,13 +226,17 @@ contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, Ow
         return totalValue * vaultTokenShares / totalSupply;
     }
 
-
     /// @notice Deposit rewards to the contract and mint share tokens to the recipient.
     /// @param _tokens addresses of ERC20 tokens to deposit
     /// @param amounts amounts of tokens to deposit
     /// @param shareToMint amount of share token (= LRT^2 token) to mint
     /// @param recipientForMintedShare recipient of the minted share token
-    function _deposit(address[] memory _tokens, uint256[] memory amounts, uint256 shareToMint, address recipientForMintedShare) internal {
+    function _deposit(
+        address[] memory _tokens,
+        uint256[] memory amounts,
+        uint256 shareToMint,
+        address recipientForMintedShare
+    ) internal {
         for (uint256 i = 0; i < _tokens.length; i++) {
             require(isTokenRegistered(_tokens[i]), "TOKEN_NOT_REGISTERED");
 
@@ -242,11 +247,20 @@ contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, Ow
     }
 
     function _convertToShares(uint256 valueInUsd, Math.Rounding rounding) public view virtual returns (uint256) {
-        return valueInUsd.mulDiv(totalSupply() + 10 ** _decimalsOffset(), getVaultTokenValuesInUsd(totalSupply()) + 1, rounding);
+        return valueInUsd.mulDiv(
+            totalSupply() + 10 ** _decimalsOffset(), getVaultTokenValuesInUsd(totalSupply()) + 1, rounding
+        );
     }
 
-    function _convertToAssetAmount(address assetToken, uint256 vaultShares, Math.Rounding rounding) internal view virtual returns (uint256) {
-        return vaultShares.mulDiv(IERC20(assetToken).balanceOf(address(this)) + 1, totalSupply() + 10 ** _decimalsOffset(), rounding);
+    function _convertToAssetAmount(address assetToken, uint256 vaultShares, Math.Rounding rounding)
+        internal
+        view
+        virtual
+        returns (uint256)
+    {
+        return vaultShares.mulDiv(
+            IERC20(assetToken).balanceOf(address(this)) + 1, totalSupply() + 10 ** _decimalsOffset(), rounding
+        );
     }
 
     function _decimalsOffset() internal view virtual returns (uint8) {

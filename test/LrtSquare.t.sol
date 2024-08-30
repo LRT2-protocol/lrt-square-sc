@@ -14,9 +14,7 @@ import "src/interfaces/IPriceProvider.sol";
 import "src/PriceProvider.sol";
 
 contract ERC20Mintable is ERC20 {
-
-    constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {
-    }
+    constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {}
 
     function mint(address to, uint256 amount) public {
         _mint(to, amount);
@@ -24,7 +22,6 @@ contract ERC20Mintable is ERC20 {
 }
 
 contract LrtSquareTest is Test {
-    
     LrtSquare public lrtSquare;
 
     ERC20Mintable[] public tokens;
@@ -34,7 +31,7 @@ contract LrtSquareTest is Test {
     address public alice = vm.addr(2);
     address public bob = vm.addr(3);
 
-    address public merkleDistributor = vm.addr(1000); 
+    address public merkleDistributor = vm.addr(1000);
 
     function setUp() public {
         vm.startPrank(owner);
@@ -104,7 +101,7 @@ contract LrtSquareTest is Test {
         // Fail if not registered
         vm.expectRevert("TOKEN_NOT_REGISTERED");
         lrtSquare.deposit(_tokens, _amounts, recipient);
-    
+
         lrtSquare.registerToken(address(tokens[0]), priceProviders[0]);
 
         assertEq(lrtSquare.balanceOf(alice), 0);
@@ -124,7 +121,6 @@ contract LrtSquareTest is Test {
         assertApproxEqAbs(assetAmounts[0], 10 ether, 10);
     }
 
-
     function test_avs_rewards_scenario_1() public {
         address merkleDistributor = vm.addr(1007);
 
@@ -139,7 +135,7 @@ contract LrtSquareTest is Test {
         // 1. At week-0, ether.fi receives an AVS reward 'tokens[0]'
         // Assume that only alice was holding 1 weETH
         // tokens[0] rewards amount is 100 ether
-        // 
+        //
         // Perform `distributeRewards`
         // - ether.fi sends the 'tokens[o]' rewards 100 ether to the LrtSquare vault
         // - ether.fi mints LRT^2 tokens 1 ether to merkleDistributor. merkleDistributor will distribute the LrtSquare to Alice
@@ -171,7 +167,7 @@ contract LrtSquareTest is Test {
 
             assertApproxEqAbs(lrtSquare.previewDeposit(assets, amounts), 40000 * 1e6, 1); // 200 * 200 = 40000 USDC worth
             lrtSquare.deposit(assets, amounts, merkleDistributor);
-            // (1 + 2) ether LRT^2 == {tokens[0]: 100 + 200 ether} 
+            // (1 + 2) ether LRT^2 == {tokens[0]: 100 + 200 ether}
             // --> 1 ether LRT^2 == {tokens[0]: 100 ether}
         }
 
@@ -192,7 +188,7 @@ contract LrtSquareTest is Test {
             /// @dev this will be unfair distribution to the existing holders of LRT^2
             // (1 + 2 + 2) ether LRT^2 == {tokens[0]: 100 + 200 + 100 ether}
             // After 'distributeRewards'. the value of LRT^2 token has decreased
-            // - from 1 ether LRT^2 == {tokens[0]: 100 ether} 
+            // - from 1 ether LRT^2 == {tokens[0]: 100 ether}
             // - to 1 ether LRT^2 == {tokens[0]: 80 ether}
 
             // (1 + 2 + x) ether LRT^2 == {tokens[0]: 100 + 200 + 100 ether}
@@ -222,7 +218,7 @@ contract LrtSquareTest is Test {
             amounts[1] = 10 ether;
 
             // We must ensure that the value per LRT^2 token remains the same before/after the deposit of AVS rewards + miting new shares
-            // 
+            //
             // Here's the breakdown using actual values:
             // Currently:
             // - the vault contract currently has 300 token0
@@ -231,7 +227,7 @@ contract LrtSquareTest is Test {
             // Newly:
             // - we add 100 token0 (20,000 USDC) and 10 token1 (200 USDC) to the vault
             // - we mint new shares equivalent to the proportion of the increase
-            // 
+            //
 
             // To maintain the value of each share, new shares equivalent to the proportion of the increase must be minted.
             // Execute 'distributeRewards' operation
@@ -243,5 +239,4 @@ contract LrtSquareTest is Test {
         lrtSquare.totalSupply();
         vm.stopPrank();
     }
-
 }
