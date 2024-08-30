@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.25;
 
 interface IPriceProvider {
     /// @notice Get the price of the token in USD (6 decimals) for the token amount = 1 * 10 ** token.decimals()

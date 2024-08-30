@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.25;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import "@openzeppelin-upgradeable/contracts/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
-import "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin-upgradeable/contracts/access/OwnableUpgradeable.sol";
+import {ERC20PermitUpgradeable} from
+    "@openzeppelin-upgradeable/contracts/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
+import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgradeable/contracts/access/OwnableUpgradeable.sol";
 
-import "src/interfaces/IPriceProvider.sol";
+import {IPriceProvider} from "src/interfaces/IPriceProvider.sol";
 
 /*
     AVSs pay out rewards to stakers in their ERC20 tokens.
@@ -24,7 +25,6 @@ import "src/interfaces/IPriceProvider.sol";
     benefiting users with smaller stakes who might prefer managing/trading their share tokens directly, 
     while larger holders have the option to redeem and potentially arbitrage.
 */
-
 contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, OwnableUpgradeable {
     using SafeERC20 for IERC20;
     using Math for uint256;
@@ -35,29 +35,34 @@ contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, Ow
         IPriceProvider priceProvider;
     }
 
+    address public governor;
     mapping(address => TokenInfo) public tokenInfos;
+    mapping(address => bool) public depositor;
     address[] public tokens;
 
     event TokenRegistered(address token);
     event TokenUpdated(address token, bool whitelisted, IPriceProvider priceProvider);
+    event GovernorSet(address oldGovernor, address newGovernor);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(string memory name, string memory symbol) public initializer {
+    function initialize(string memory name, string memory symbol, address _governor) public initializer {
         __ERC20_init(name, symbol);
         __ERC20Permit_init(name);
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
+
+        governor = _governor;
     }
 
     function mint(address to, uint256 shareToMint) external onlyOwner {
         _mint(to, shareToMint);
     }
 
-    function registerToken(address _token, IPriceProvider _priceProvider) external onlyOwner {
+    function registerToken(address _token, IPriceProvider _priceProvider) external onlyGovernor {
         require(!isTokenRegistered(_token), "TOKEN_ALREADY_REGISTERED");
 
         tokenInfos[_token] = TokenInfo({registered: true, whitelisted: true, priceProvider: _priceProvider});
@@ -67,7 +72,7 @@ contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, Ow
         emit TokenUpdated(_token, true, _priceProvider);
     }
 
-    function updateWhitelist(address _token, bool _whitelist) external onlyOwner {
+    function updateWhitelist(address _token, bool _whitelist) external onlyGovernor {
         require(isTokenRegistered(_token), "TOKEN_NOT_REGISTERED");
 
         tokenInfos[_token].whitelisted = _whitelist;
@@ -75,7 +80,24 @@ contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, Ow
         emit TokenUpdated(_token, _whitelist, tokenInfos[_token].priceProvider);
     }
 
-    function updatePriceProvider(address _token, IPriceProvider _priceProvider) external onlyOwner {
+    function setDepositors(address[] memory depositors, bool[] memory isDepositor) external onlyGovernor {
+        uint256 len = depositors.length;
+        require(len == isDepositor.length, "ARRAY_LENGTH_MISMATCH");
+        for (uint256 i = 0; i < len;) {
+            depositor[depositors[i]] = isDepositor[i];
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    function setGovernor(address _governor) external onlyGovernor {
+        emit GovernorSet(governor, _governor);
+        governor = _governor;
+    }
+
+    function updatePriceProvider(address _token, IPriceProvider _priceProvider) external onlyGovernor {
         require(isTokenRegistered(_token), "TOKEN_NOT_REGISTERED");
 
         tokenInfos[_token].priceProvider = _priceProvider;
@@ -84,18 +106,18 @@ contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, Ow
     }
 
     /// @notice Deposit rewards to the contract and mint share tokens to the recipient.
-    /// @param tokens addresses of ERC20 tokens to deposit
-    /// @param amounts amounts of tokens to deposit
-    /// @param receiver recipient of the minted share token
-    function deposit(address[] memory tokens, uint256[] memory amounts, address receiver) external onlyOwner {
-        require(tokens.length == amounts.length, "INVALID_INPUT");
-        require(receiver != address(0), "INVALID_RECIPIENT");
+    /// @param _tokens addresses of ERC20 tokens to deposit
+    /// @param _amounts amounts of tokens to deposit
+    /// @param _receiver recipient of the minted share token
+    function deposit(address[] memory _tokens, uint256[] memory _amounts, address _receiver) external onlyDepositors {
+        require(_tokens.length == _amounts.length, "INVALID_INPUT");
+        require(_receiver != address(0), "INVALID_RECIPIENT");
 
         bool initial_deposit = (totalSupply() == 0);
         uint256 before_VaultTokenValue = getVaultTokenValuesInUsd(1 * 10 ** decimals());
 
-        uint256 shareToMint = previewDeposit(tokens, amounts);
-        _deposit(tokens, amounts, shareToMint, receiver);
+        uint256 shareToMint = previewDeposit(_tokens, _amounts);
+        _deposit(_tokens, _amounts, shareToMint, _receiver);
 
         uint256 after_VaultTokenValue = getVaultTokenValuesInUsd(1 * 10 ** decimals());
 
@@ -187,8 +209,8 @@ contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, Ow
 
         uint256 totalValue = 0;
         for (uint256 i = 0; i < assets.length; i++) {
-            totalValue += assetAmounts[i] * tokenInfos[assets[i]].priceProvider.getPriceInUsd()
-                / 10 ** ERC20(assets[i]).decimals();
+            totalValue +=
+                (assetAmounts[i] * tokenInfos[assets[i]].priceProvider.getPriceInUsd()) / 10 ** _getDecimals(assets[i]);
         }
 
         return totalValue;
@@ -210,7 +232,7 @@ contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, Ow
             TokenInfo memory tokenInfo = tokenInfos[_tokens[i]];
 
             uint256 tokenValueInUSDC = tokenInfo.priceProvider.getPriceInUsd();
-            total_usd += amounts[i] * tokenValueInUSDC / 10 ** ERC20(_tokens[i]).decimals();
+            total_usd += (amounts[i] * tokenValueInUSDC) / 10 ** _getDecimals(_tokens[i]);
         }
         return total_usd;
     }
@@ -223,7 +245,7 @@ contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, Ow
 
         (address[] memory assets, uint256[] memory assetAmounts) = totalAssets();
         uint256 totalValue = getAvsTokenValuesInUsd(assets, assetAmounts);
-        return totalValue * vaultTokenShares / totalSupply;
+        return (totalValue * vaultTokenShares) / totalSupply;
     }
 
     /// @notice Deposit rewards to the contract and mint share tokens to the recipient.
@@ -267,5 +289,27 @@ contract LrtSquare is Initializable, ERC20PermitUpgradeable, UUPSUpgradeable, Ow
         return 0;
     }
 
+    function _getDecimals(address erc20) internal view returns (uint8) {
+        return IERC20Metadata(erc20).decimals();
+    }
+
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    modifier onlyGovernor() {
+        _onlyGovernor();
+        _;
+    }
+
+    function _onlyGovernor() internal view {
+        require(msg.sender == governor, "ONLY_GOVERNOR");
+    }
+
+    modifier onlyDepositors() {
+        _onlyDepositors();
+        _;
+    }
+
+    function _onlyDepositors() internal view {
+        require(depositor[msg.sender], "ONLY_DEPOSITORS");
+    }
 }
