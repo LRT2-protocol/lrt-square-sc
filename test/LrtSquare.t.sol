@@ -20,7 +20,11 @@ import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 contract ERC20Mintable is ERC20 {
     uint8 __decimals;
 
-    constructor(string memory name_, string memory symbol_, uint8 _decimals) ERC20(name_, symbol_) {
+    constructor(
+        string memory name_,
+        string memory symbol_,
+        uint8 _decimals
+    ) ERC20(name_, symbol_) {
         __decimals = _decimals;
     }
 
@@ -64,7 +68,9 @@ contract LrtSquareTest is Test {
         timelock.grantRole(timelock.EXECUTOR_ROLE(), address(0));
         timelock.renounceRole(timelock.DEFAULT_ADMIN_ROLE(), admin);
 
-        lrtSquare = LrtSquare(address(new UUPSProxy(address(new LrtSquare()), "")));
+        lrtSquare = LrtSquare(
+            address(new UUPSProxy(address(new LrtSquare()), ""))
+        );
         lrtSquare.initialize("LrtSquare", "LRT", address(timelock));
 
         tokens.push(new ERC20Mintable("Token1", "TK1", 18));
@@ -137,10 +143,15 @@ contract LrtSquareTest is Test {
         lrtSquare.deposit(_tokens, _amounts, recipient);
 
         assertApproxEqAbs(lrtSquare.balanceOf(alice), 1000 * 1e6, 10 gwei);
-        assertApproxEqAbs(lrtSquare.assetOf(alice, address(tokens[0])), 10 ether, 10 gwei);
+        assertApproxEqAbs(
+            lrtSquare.assetOf(alice, address(tokens[0])),
+            10 ether,
+            10 gwei
+        );
         vm.stopPrank();
 
-        (address[] memory assets, uint256[] memory assetAmounts) = lrtSquare.totalAssets();
+        (address[] memory assets, uint256[] memory assetAmounts) = lrtSquare
+            .totalAssets();
         assertEq(assets.length, 1);
         assertEq(assetAmounts.length, 1);
         assertEq(assets[0], address(tokens[0]));
@@ -180,10 +191,15 @@ contract LrtSquareTest is Test {
         lrtSquare.deposit(_tokens, _amounts, recipient);
 
         assertApproxEqAbs(lrtSquare.balanceOf(alice), 1000e6, 10 gwei);
-        assertApproxEqAbs(lrtSquare.assetOf(alice, address(tokens[2])), 1000e6, 10);
+        assertApproxEqAbs(
+            lrtSquare.assetOf(alice, address(tokens[2])),
+            1000e6,
+            10
+        );
         vm.stopPrank();
 
-        (address[] memory assets, uint256[] memory assetAmounts) = lrtSquare.totalAssets();
+        (address[] memory assets, uint256[] memory assetAmounts) = lrtSquare
+            .totalAssets();
         assertEq(assets.length, 1);
         assertEq(assetAmounts.length, 1);
         assertEq(assets[0], address(tokens[2]));
@@ -219,13 +235,24 @@ contract LrtSquareTest is Test {
             uint256[] memory amounts = new uint256[](1);
             assets[0] = address(tokens[0]);
             amounts[0] = 100 ether;
-            assertApproxEqAbs(lrtSquare.previewDeposit(assets, amounts), 20000 * 1e6, 1); // 100 * 200 = 20000 USDC worth
+            assertApproxEqAbs(
+                lrtSquare.previewDeposit(assets, amounts),
+                20000 * 1e6,
+                1
+            ); // 100 * 200 = 20000 USDC worth
             lrtSquare.deposit(assets, amounts, merkleDistributor);
             // 1 ether LRT^2 == {tokens[0]: 100 ether}
         }
 
-        assertApproxEqAbs(lrtSquare.totalAssetsValueInUsd(), 100 * 200 * 1e6, 1);
-        assertEq(lrtSquare.totalSupply(), 100 * priceProviders[0].getPriceInUsd()); // initial mint
+        assertApproxEqAbs(
+            lrtSquare.totalAssetsValueInUsd(),
+            100 * 200 * 1e6,
+            1
+        );
+        assertEq(
+            lrtSquare.totalSupply(),
+            100 * priceProviders[0].getPriceInUsd()
+        ); // initial mint
 
         // 2. At week-1, ether.fi receives rewards
         // Assume that {alice, bob} were holding 1 weETH
@@ -238,13 +265,21 @@ contract LrtSquareTest is Test {
             assets[0] = address(tokens[0]);
             amounts[0] = 200 ether;
 
-            assertApproxEqAbs(lrtSquare.previewDeposit(assets, amounts), 40000 * 1e6, 1); // 200 * 200 = 40000 USDC worth
+            assertApproxEqAbs(
+                lrtSquare.previewDeposit(assets, amounts),
+                40000 * 1e6,
+                1
+            ); // 200 * 200 = 40000 USDC worth
             lrtSquare.deposit(assets, amounts, merkleDistributor);
             // (1 + 2) ether LRT^2 == {tokens[0]: 100 + 200 ether}
             // --> 1 ether LRT^2 == {tokens[0]: 100 ether}
         }
 
-        assertApproxEqAbs(lrtSquare.totalAssetsValueInUsd(), (100 + 200) * 200 * 1e6, 1);
+        assertApproxEqAbs(
+            lrtSquare.totalAssetsValueInUsd(),
+            (100 + 200) * 200 * 1e6,
+            1
+        );
 
         // 3. At week-3, ether.fi receives rewards
         // Assume that {alice, bob} were holding 1 weETH
@@ -268,13 +303,21 @@ contract LrtSquareTest is Test {
             // What should be 'x' to make it fair distribution; keep the current LRT^2 token's value the same after 'distributeRewards'
             // 100 ether = (100 + 200 + 100) ether / (1 + 2 + x)
             // => x = (100 + 200 + 100) / 100 - (1 + 2) = 1
-            assertApproxEqAbs(lrtSquare.previewDeposit(assets, amounts), 20000 * 1e6, 1); // 100 * 200 = 20000 USDC worth
+            assertApproxEqAbs(
+                lrtSquare.previewDeposit(assets, amounts),
+                20000 * 1e6,
+                1
+            ); // 100 * 200 = 20000 USDC worth
             lrtSquare.deposit(assets, amounts, merkleDistributor);
             // (1 + 2 + 1) ether LRT^2 == {tokens[0]: 100 + 200 + 100 ether}
             // --> 1 ether LRT^2 == {tokens[0]: 100 ether}
         }
 
-        assertApproxEqAbs(lrtSquare.totalAssetsValueInUsd(), (100 + 200 + 100) * 200 * 1e6, 1);
+        assertApproxEqAbs(
+            lrtSquare.totalAssetsValueInUsd(),
+            (100 + 200 + 100) * 200 * 1e6,
+            1
+        );
 
         // 4. At week-3, ether.fi receives rewards from one more AVS
         // Assume that {alice, bob} were holding 1 weETH
@@ -304,11 +347,19 @@ contract LrtSquareTest is Test {
 
             // To maintain the value of each share, new shares equivalent to the proportion of the increase must be minted.
             // Execute 'distributeRewards' operation
-            assertApproxEqAbs(lrtSquare.previewDeposit(assets, amounts), 20200 * 1e6, 1); // 100 * 200 + 10 * 20 = 20200 USDC worth
+            assertApproxEqAbs(
+                lrtSquare.previewDeposit(assets, amounts),
+                20200 * 1e6,
+                1
+            ); // 100 * 200 + 10 * 20 = 20200 USDC worth
             lrtSquare.deposit(assets, amounts, merkleDistributor);
         }
 
-        assertApproxEqAbs(lrtSquare.totalAssetsValueInUsd(), (100 + 200 + 100 + 100) * 200 * 1e6 + 10 * 20 * 1e6, 1);
+        assertApproxEqAbs(
+            lrtSquare.totalAssetsValueInUsd(),
+            (100 + 200 + 100 + 100) * 200 * 1e6 + 10 * 20 * 1e6,
+            1
+        );
         lrtSquare.totalSupply();
         vm.stopPrank();
     }
@@ -325,11 +376,13 @@ contract LrtSquareTest is Test {
 
     function test_CanUpdatePriceProvider() public {
         _registerToken(address(tokens[0]), priceProviders[0]);
-        (,, IPriceProvider priceProvider) = lrtSquare.tokenInfos(address(tokens[0]));
+        (, , IPriceProvider priceProvider) = lrtSquare.tokenInfos(
+            address(tokens[0])
+        );
         assertEq(address(priceProvider), address(priceProviders[0]));
 
         _updatePriceProvider(address(tokens[0]), priceProviders[1]);
-        (,, priceProvider) = lrtSquare.tokenInfos(address(tokens[0]));
+        (, , priceProvider) = lrtSquare.tokenInfos(address(tokens[0]));
         assertEq(address(priceProvider), address(priceProviders[1]));
     }
 
@@ -341,35 +394,63 @@ contract LrtSquareTest is Test {
         _setDepositors(depositors, isDepositor);
     }
 
-    function _registerToken(address token, IPriceProvider priceProvider) internal {
+    function _registerToken(
+        address token,
+        IPriceProvider priceProvider
+    ) internal {
         string memory description = "Proposal: Register token";
-        bytes memory data = abi.encodeWithSelector(LrtSquare.registerToken.selector, token, priceProvider);
+        bytes memory data = abi.encodeWithSelector(
+            LrtSquare.registerToken.selector,
+            token,
+            priceProvider
+        );
 
         _executeGovernance(data, description);
     }
 
     function _updateWhitelist(address token, bool whitelist) internal {
         string memory description = "Proposal: Whitelist token";
-        bytes memory data = abi.encodeWithSelector(LrtSquare.updateWhitelist.selector, token, whitelist);
+        bytes memory data = abi.encodeWithSelector(
+            LrtSquare.updateWhitelist.selector,
+            token,
+            whitelist
+        );
 
         _executeGovernance(data, description);
     }
 
-    function _updatePriceProvider(address token, IPriceProvider priceProvider) internal {
+    function _updatePriceProvider(
+        address token,
+        IPriceProvider priceProvider
+    ) internal {
         string memory description = "Proposal: Update price provider for token";
-        bytes memory data = abi.encodeWithSelector(LrtSquare.updatePriceProvider.selector, token, priceProvider);
+        bytes memory data = abi.encodeWithSelector(
+            LrtSquare.updatePriceProvider.selector,
+            token,
+            priceProvider
+        );
 
         _executeGovernance(data, description);
     }
 
-    function _setDepositors(address[] memory depositors, bool[] memory isDepositor) internal {
+    function _setDepositors(
+        address[] memory depositors,
+        bool[] memory isDepositor
+    ) internal {
         string memory description = "Proposal: Set depositors";
-        bytes memory data = abi.encodeWithSelector(LrtSquare.setDepositors.selector, depositors, isDepositor);
+        bytes memory data = abi.encodeWithSelector(
+            LrtSquare.setDepositors.selector,
+            depositors,
+            isDepositor
+        );
 
         _executeGovernance(data, description);
     }
 
-    function _executeGovernance(bytes memory data, string memory description) internal {
+    function _executeGovernance(
+        bytes memory data,
+        string memory description
+    ) internal {
         address[] memory targets = new address[](1);
         uint256[] memory values = new uint256[](1);
         bytes[] memory calldatas = new bytes[](1);
@@ -379,7 +460,12 @@ contract LrtSquareTest is Test {
         values[0] = 0;
         calldatas[0] = data;
 
-        uint256 proposalId = governance.hashProposal(targets, values, calldatas, descriptionHash);
+        uint256 proposalId = governance.hashProposal(
+            targets,
+            values,
+            calldatas,
+            descriptionHash
+        );
 
         uint256 votingDelay = governance.votingDelay();
 
@@ -399,7 +485,13 @@ contract LrtSquareTest is Test {
         vm.roll(proposalDeadline);
         governance.queue(targets, values, calldatas, descriptionHash);
 
-        bytes32 id = timelock.hashOperationBatch(targets, values, calldatas, 0, _timelockSalt(descriptionHash));
+        bytes32 id = timelock.hashOperationBatch(
+            targets,
+            values,
+            calldatas,
+            0,
+            _timelockSalt(descriptionHash)
+        );
 
         uint256 executeTimestamp = timelock.getTimestamp(id) + 1;
 
@@ -409,7 +501,9 @@ contract LrtSquareTest is Test {
         vm.stopPrank();
     }
 
-    function _timelockSalt(bytes32 descriptionHash) private view returns (bytes32) {
+    function _timelockSalt(
+        bytes32 descriptionHash
+    ) private view returns (bytes32) {
         return bytes20(address(governance)) ^ descriptionHash;
     }
 }
