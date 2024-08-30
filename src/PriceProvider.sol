@@ -3,7 +3,6 @@ pragma solidity ^0.8.13;
 
 import "src/interfaces/IPriceProvider.sol";
 
-
 contract PriceProvider is IPriceProvider {
     uint256 public price;
 
