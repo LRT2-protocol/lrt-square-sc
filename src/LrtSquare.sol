@@ -8,6 +8,8 @@ import {ERC20PermitUpgradeable} from "@openzeppelin-upgradeable/contracts/token/
 import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {IPriceProvider} from "src/interfaces/IPriceProvider.sol";
 import {Governable} from "./governance/Governable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
+import {AccessControlDefaultAdminRulesUpgradeable} from "@openzeppelin-upgradeable/contracts/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 
 /*
     AVSs pay out rewards to stakers in their ERC20 tokens.
@@ -25,6 +27,8 @@ contract LrtSquare is
     Initializable,
     Governable,
     ERC20PermitUpgradeable,
+    PausableUpgradeable,
+    AccessControlDefaultAdminRulesUpgradeable,
     UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
@@ -35,10 +39,15 @@ contract LrtSquare is
         bool whitelisted;
     }
 
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+
     mapping(address => TokenInfo) public tokenInfos;
     mapping(address => bool) public depositor;
     address[] public tokens;
     address public priceProvider;
+
+    uint256 public depositForCommunityPause;
+    uint256 public communityPauseDepositedAmt;
 
     event TokenRegistered(address token);
     event TokenWhitelisted(address token, bool whitelisted);
@@ -58,6 +67,12 @@ contract LrtSquare is
         address[] tokens,
         uint256[] amounts
     );
+    event CommunityPauseDepositSet(uint256 oldAmount, uint256 newAmount);
+    event CommunityPause(address indexed pauser);
+    event CommunityPauseAmountWithdrawal(
+        address indexed withdrawer,
+        uint256 amount
+    );
 
     error TokenAlreadyRegistered();
     error TokenNotWhitelisted();
@@ -71,6 +86,10 @@ contract LrtSquare is
     error OnlyDepositors();
     error PriceProviderNotConfigured();
     error PriceProviderFailed();
+    error CommunityPauseDepositNotSet();
+    error IncorrectAmountOfEtherSent();
+    error WithdrawCommunityDepositedPauseAmountBeforeUnpausing();
+    error EtherTransferFailed();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -80,11 +99,15 @@ contract LrtSquare is
     function initialize(
         string memory __name,
         string memory __symbol,
-        address __governor
+        uint48 __accessControlDelay,
+        address __governor,
+        address __pauser
     ) public initializer {
         __ERC20_init(__name, __symbol);
         __ERC20Permit_init(__name);
         __UUPSUpgradeable_init();
+        __AccessControlDefaultAdminRules_init(__accessControlDelay, __governor);
+        _grantRole(PAUSER_ROLE, __pauser);
 
         _setGovernor(__governor);
     }
@@ -148,7 +171,7 @@ contract LrtSquare is
         address[] memory _tokens,
         uint256[] memory _amounts,
         address _receiver
-    ) external onlyDepositors {
+    ) external whenNotPaused onlyDepositors {
         if (_tokens.length != _amounts.length) revert ArrayLengthMismatch();
         if (_receiver == address(0)) revert InvalidRecipient();
 
@@ -354,6 +377,47 @@ contract LrtSquare is
         ) = totalAssets();
         uint256 totalValue = getAvsTokenValuesInEth(assets, assetAmounts);
         return (totalValue * vaultTokenShares) / totalSupply;
+    }
+
+    function communityPause() external payable whenNotPaused {
+        if (depositForCommunityPause == 0) revert CommunityPauseDepositNotSet();
+        if (msg.value != depositForCommunityPause)
+            revert IncorrectAmountOfEtherSent();
+
+        _pause();
+        communityPauseDepositedAmt = msg.value;
+        emit CommunityPause(msg.sender);
+    }
+
+    function pause() external onlyRole(PAUSER_ROLE) whenNotPaused {
+        _pause();
+    }
+
+    function unpause() external onlyRole(PAUSER_ROLE) whenPaused {
+        if (communityPauseDepositedAmt != 0)
+            revert WithdrawCommunityDepositedPauseAmountBeforeUnpausing();
+
+        _unpause();
+    }
+
+    function withdrawCommunityDepositedPauseAmount()
+        external
+        onlyRole(PAUSER_ROLE)
+    {
+        uint256 amount = communityPauseDepositedAmt;
+        communityPauseDepositedAmt = 0;
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+
+        if (!success) revert EtherTransferFailed();
+
+        emit CommunityPauseAmountWithdrawal(msg.sender, amount);
+    }
+
+    function setCommunityPauseDepositAmount(
+        uint256 amount
+    ) external onlyGovernor {
+        emit CommunityPauseDepositSet(depositForCommunityPause, amount);
+        depositForCommunityPause = amount;
     }
 
     /// @notice Deposit rewards to the contract and mint share tokens to the recipient.
