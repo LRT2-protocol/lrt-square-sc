@@ -36,6 +36,7 @@ contract LrtSquare is
     struct TokenInfo {
         bool registered;
         bool whitelisted;
+        uint64 maxPercentageInVault;
     }
 
     mapping(address => TokenInfo) public tokenInfos;
@@ -66,6 +67,7 @@ contract LrtSquare is
     );
     event RefillRateUpdated(uint64 oldRate, uint64 newRate);
     event RateLimitCapacityUpdated(uint64 oldCapacity, uint64 newCapacity);
+    event TokenMaxPercentageLimitUpdated(uint64 oldPercentage, uint64 newPercentage);
 
     error TokenAlreadyRegistered();
     error TokenNotWhitelisted();
@@ -81,6 +83,8 @@ contract LrtSquare is
     error PriceProviderFailed();
     error RateLimitExceeded();
     error RateLimitRefillRateCannotBeGreaterThanCapacity();
+    error PercentageCannotBeGreaterThanHundred();
+    error TokenMaxPercentageBreached();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -113,19 +117,20 @@ contract LrtSquare is
         return rateLimit.getCurrent();
     } 
 
-    function registerToken(address _token) external onlyGovernor {
+    function registerToken(address _token, uint64 _maxPercentageInVault) external onlyGovernor {
         if (_token == address(0)) revert InvalidValue();
         if (isTokenRegistered(_token)) revert TokenAlreadyRegistered();
         if (IPriceProvider(priceProvider).getPriceInEth(_token) == 0)
             revert PriceProviderNotConfigured();
+        if (_maxPercentageInVault > HUNDRED_PERCENT_LIMIT) revert PercentageCannotBeGreaterThanHundred();
 
-        tokenInfos[_token] = TokenInfo({registered: true, whitelisted: true});
+        tokenInfos[_token] = TokenInfo({registered: true, whitelisted: true, maxPercentageInVault: _maxPercentageInVault});
         tokens.push(_token);
 
         emit TokenRegistered(_token);
         emit TokenWhitelisted(_token, true);
     }
-
+    
     function updateWhitelist(
         address _token,
         bool _whitelist
@@ -134,6 +139,14 @@ contract LrtSquare is
         if (!isTokenRegistered(_token)) revert TokenNotRegistered();
         tokenInfos[_token].whitelisted = _whitelist;
         emit TokenWhitelisted(_token, _whitelist);
+    }
+
+    function updateMaxPercentageInVault(address _token, uint64 _maxPercentageInVault) external onlyGovernor {
+        if (_token == address(0)) revert InvalidValue();
+        if (!isTokenRegistered(_token)) revert TokenNotRegistered();
+        if (_maxPercentageInVault > HUNDRED_PERCENT_LIMIT) revert PercentageCannotBeGreaterThanHundred();
+        emit TokenMaxPercentageLimitUpdated(tokenInfos[_token].maxPercentageInVault, _maxPercentageInVault);
+        tokenInfos[_token].maxPercentageInVault = _maxPercentageInVault;
     }
 
     function setDepositors(
@@ -159,6 +172,20 @@ contract LrtSquare is
         emit PriceProviderSet(priceProvider, _priceProvider);
         priceProvider = _priceProvider;
     }
+
+
+    function setRefillRatePerSecond(uint64 refillRate) external onlyGovernor {
+        BucketLimiter.Limit memory limit = rateLimit.getCurrent();
+        if (refillRate > limit.capacity) revert RateLimitRefillRateCannotBeGreaterThanCapacity();
+        emit RefillRateUpdated(limit.refillRate, refillRate);
+        rateLimit.refillRate = refillRate;
+    }
+    
+    function setRateLimitCapacity(uint64 capacity) external onlyGovernor {
+        emit RateLimitCapacityUpdated(rateLimit.capacity, capacity);
+        rateLimit.capacity = capacity;
+    }
+
 
     /// @notice Deposit rewards to the contract and mint share tokens to the recipient.
     /// @param _tokens addresses of ERC20 tokens to deposit
@@ -187,6 +214,8 @@ contract LrtSquare is
         
         _deposit(_tokens, _amounts, shareToMint, _receiver);
 
+        _checkPercentagesInVault();
+
         uint256 after_VaultTokenValue = getVaultTokenValuesInEth(
             1 * 10 ** decimals()
         );
@@ -214,18 +243,6 @@ contract LrtSquare is
         }
 
         emit Redeem(msg.sender, vaultShares, assets, assetAmounts);
-    }
-
-    function setRefillRatePerSecond(uint64 refillRate) external onlyGovernor {
-        BucketLimiter.Limit memory limit = rateLimit.getCurrent();
-        if (refillRate > limit.capacity) revert RateLimitRefillRateCannotBeGreaterThanCapacity();
-        emit RefillRateUpdated(limit.refillRate, refillRate);
-        rateLimit.refillRate = refillRate;
-    }
-    
-    function setRateLimitCapacity(uint64 capacity) external onlyGovernor {
-        emit RateLimitCapacityUpdated(rateLimit.capacity, capacity);
-        rateLimit.capacity = capacity;
     }
 
     function previewDeposit(
@@ -379,6 +396,20 @@ contract LrtSquare is
         return total_eth;
     }
 
+    function getAvsTokenTotalValuesInEth(
+        address token
+    ) public view returns (uint256) {
+        if (!isTokenRegistered(token)) revert TokenNotRegistered();
+        if (!isTokenWhitelisted(token)) revert TokenNotWhitelisted();
+
+        uint256 price = IPriceProvider(priceProvider).getPriceInEth(
+            token
+        );
+        if (price == 0) revert PriceProviderFailed();
+
+        return (IERC20(token).balanceOf(address(this)) * IPriceProvider(priceProvider).getPriceInEth(token)) / 10 ** _getDecimals(token);
+    }
+
     function getVaultTokenValuesInEth(
         uint256 vaultTokenShares
     ) public view returns (uint256) {
@@ -394,6 +425,23 @@ contract LrtSquare is
         uint256 totalValue = getAvsTokenValuesInEth(assets, assetAmounts);
         return (totalValue * vaultTokenShares) / totalSupply;
     }
+
+    function getPercentagesInVault() public view returns (uint64[] memory) {
+        uint256 len = tokens.length;
+        uint64[] memory percentagesInVault = new uint64[](len);
+        uint256 vaultTotalValue = getVaultTokenValuesInEth(totalSupply());
+
+        for (uint256 i = 0; i < len; ) {
+            uint256 valueOfTokenInVault = getAvsTokenTotalValuesInEth(tokens[i]);
+            percentagesInVault[i] = SafeCast.toUint64((valueOfTokenInVault * HUNDRED_PERCENT_LIMIT) / vaultTotalValue);
+            unchecked {
+                ++i;
+            }
+        }
+
+        return percentagesInVault;
+    }
+
 
     /// @notice Deposit rewards to the contract and mint share tokens to the recipient.
     /// @param _tokens addresses of ERC20 tokens to deposit
@@ -451,6 +499,23 @@ contract LrtSquare is
 
     function _getDecimals(address erc20) internal view returns (uint8) {
         return IERC20Metadata(erc20).decimals();
+    }
+
+    function _checkPercentagesInVault() internal view {
+        uint256 len = tokens.length;
+        uint64[] memory percentagesInVault = new uint64[](len);
+        uint256 vaultTotalValue = getVaultTokenValuesInEth(totalSupply());
+
+        if(vaultTotalValue == 0) return;
+
+        for (uint256 i = 0; i < len; ) {
+            uint256 valueOfTokenInVault = getAvsTokenTotalValuesInEth(tokens[i]);
+            percentagesInVault[i] = SafeCast.toUint64((valueOfTokenInVault * HUNDRED_PERCENT_LIMIT) / vaultTotalValue);
+            if (percentagesInVault[i] > tokenInfos[tokens[i]].maxPercentageInVault) revert TokenMaxPercentageBreached();
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     function _authorizeUpgrade(

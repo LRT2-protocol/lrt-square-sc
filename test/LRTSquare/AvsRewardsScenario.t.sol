@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
 import {LRTSquareTestSetup, LrtSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
@@ -7,8 +7,8 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
     function setUp() public override {
         super.setUp();
 
-        _registerToken(address(tokens[0]), hex"");
-        _registerToken(address(tokens[1]), hex"");
+        _registerToken(address(tokens[0]), tokenMaxPercentageValues[0], hex"");
+        _registerToken(address(tokens[1]), tokenMaxPercentageValues[1], hex"");
 
         address[] memory depositors = new address[](1);
         depositors[0] = owner;
