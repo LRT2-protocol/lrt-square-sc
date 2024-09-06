@@ -80,6 +80,7 @@ contract LrtSquare is
     error PriceProviderNotConfigured();
     error PriceProviderFailed();
     error RateLimitExceeded();
+    error RateLimitRefillRateCannotBeGreaterThanCapacity();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -100,6 +101,8 @@ contract LrtSquare is
         // 1_000_000_000 = 100% for limiter
         // Limit = 3_000_000_000 -> 300% of total suppply, refill rate -> 1_000_000 -> 0.1%, so will be refilled in 3000 sec (50 mins)
         rateLimit = BucketLimiter.create(3_000_000_000, 1_000_000);
+        emit RateLimitCapacityUpdated(0, 3_000_000_000);
+        emit RefillRateUpdated(0, 1_000_000);
     }
 
     function mint(address to, uint256 shareToMint) external onlyGovernor {
@@ -214,7 +217,9 @@ contract LrtSquare is
     }
 
     function setRefillRatePerSecond(uint64 refillRate) external onlyGovernor {
-        emit RefillRateUpdated(rateLimit.refillRate, refillRate);
+        BucketLimiter.Limit memory limit = rateLimit.getCurrent();
+        if (refillRate > limit.capacity) revert RateLimitRefillRateCannotBeGreaterThanCapacity();
+        emit RefillRateUpdated(limit.refillRate, refillRate);
         rateLimit.refillRate = refillRate;
     }
     

@@ -136,4 +136,9 @@ contract LRTSquareRateLimitTest is LRTSquareTestSetup {
 
         assertEq(lrtSquare.getRateLimit().refillRate, newRate);
     }
+
+    function test_CannotSetRateLimitRefillRateMoreThanCapacity() public {
+        uint64 newRate = limit.capacity + 1;
+        _setRateLimitRefillRate(newRate, abi.encodeWithSelector(LrtSquare.RateLimitRefillRateCannotBeGreaterThanCapacity.selector));
+    }
 }
