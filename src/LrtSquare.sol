@@ -10,9 +10,6 @@ import {IPriceProvider} from "src/interfaces/IPriceProvider.sol";
 import {Governable} from "./governance/Governable.sol";
 import {BucketLimiter} from "./libraries/BucketLimiter.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import "forge-std/console.sol";
-
-
 
 /*
     AVSs pay out rewards to stakers in their ERC20 tokens.

@@ -3,7 +3,6 @@ pragma solidity ^0.8.25;
 
 import {LRTSquareTestSetup, LrtSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
 import {BucketLimiter} from "../../src/libraries/BucketLimiter.sol";
-import "forge-std/console.sol";
 
 contract LRTSquareRateLimitTest is LRTSquareTestSetup {
     uint256 initialDeposit = 100 ether;
