@@ -122,7 +122,6 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
             _amounts
         );
         uint256 expectedShares = _getSharesForEth(totalValueInEth);
-
         assertApproxEqAbs(
             lrtSquare.previewDeposit(_tokens, _amounts),
             expectedShares,

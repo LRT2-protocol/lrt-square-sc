@@ -170,6 +170,34 @@ contract LRTSquareTestSetup is Test {
         _executeGovernance(data, description, revertData);
     }
 
+    function _setRateLimitCapacity(
+        uint64 capacity,
+        bytes memory revertData
+    ) internal {
+        string memory description = "Proposal: Set rate limit";
+
+        bytes memory data = abi.encodeWithSelector(
+            LrtSquare.setRateLimitCapacity.selector,
+            capacity
+        );
+
+        _executeGovernance(data, description, revertData);
+    }
+
+    function _setRateLimitRefillRate(
+        uint64 refillRate,
+        bytes memory revertData
+    ) internal {
+        string memory description = "Proposal: Set rate limit refill rate";
+
+        bytes memory data = abi.encodeWithSelector(
+            LrtSquare.setRefillRatePerSecond.selector,
+            refillRate
+        );
+
+        _executeGovernance(data, description, revertData);
+    }
+
     function _executeGovernance(
         bytes memory data,
         string memory description,

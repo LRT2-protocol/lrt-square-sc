@@ -8,6 +8,11 @@ import {ERC20PermitUpgradeable} from "@openzeppelin-upgradeable/contracts/token/
 import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {IPriceProvider} from "src/interfaces/IPriceProvider.sol";
 import {Governable} from "./governance/Governable.sol";
+import {BucketLimiter} from "./libraries/BucketLimiter.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import "forge-std/console.sol";
+
+
 
 /*
     AVSs pay out rewards to stakers in their ERC20 tokens.
@@ -27,6 +32,7 @@ contract LrtSquare is
     ERC20PermitUpgradeable,
     UUPSUpgradeable
 {
+    using BucketLimiter for BucketLimiter.Limit;
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -39,6 +45,9 @@ contract LrtSquare is
     mapping(address => bool) public depositor;
     address[] public tokens;
     address public priceProvider;
+    BucketLimiter.Limit private rateLimit;
+
+    uint64 public constant HUNDRED_PERCENT_LIMIT = 1_000_000_000;
 
     event TokenRegistered(address token);
     event TokenWhitelisted(address token, bool whitelisted);
@@ -58,6 +67,8 @@ contract LrtSquare is
         address[] tokens,
         uint256[] amounts
     );
+    event RefillRateUpdated(uint64 oldRate, uint64 newRate);
+    event RateLimitCapacityUpdated(uint64 oldCapacity, uint64 newCapacity);
 
     error TokenAlreadyRegistered();
     error TokenNotWhitelisted();
@@ -71,6 +82,7 @@ contract LrtSquare is
     error OnlyDepositors();
     error PriceProviderNotConfigured();
     error PriceProviderFailed();
+    error RateLimitExceeded();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -87,11 +99,19 @@ contract LrtSquare is
         __UUPSUpgradeable_init();
 
         _setGovernor(__governor);
+
+        // 1_000_000_000 = 100% for limiter
+        // Limit = 3_000_000_000 -> 300% of total suppply, refill rate -> 1_000_000 -> 0.1%, so will be refilled in 3000 sec (50 mins)
+        rateLimit = BucketLimiter.create(3_000_000_000, 1_000_000);
     }
 
     function mint(address to, uint256 shareToMint) external onlyGovernor {
         _mint(to, shareToMint);
     }
+
+    function getRateLimit() external view returns (BucketLimiter.Limit memory) {
+        return rateLimit.getCurrent();
+    } 
 
     function registerToken(address _token) external onlyGovernor {
         if (_token == address(0)) revert InvalidValue();
@@ -157,7 +177,14 @@ contract LrtSquare is
             1 * 10 ** decimals()
         );
 
+        uint256 totalSupplyBeforeDeposit = totalSupply();
         uint256 shareToMint = previewDeposit(_tokens, _amounts);
+        // check rate limit
+        if (totalSupplyBeforeDeposit !=0) {
+            uint64 amountForLimit = SafeCast.toUint64((shareToMint * HUNDRED_PERCENT_LIMIT) / totalSupplyBeforeDeposit);
+            if(!rateLimit.consume(amountForLimit)) revert RateLimitExceeded();
+        } 
+        
         _deposit(_tokens, _amounts, shareToMint, _receiver);
 
         uint256 after_VaultTokenValue = getVaultTokenValuesInEth(
@@ -187,6 +214,16 @@ contract LrtSquare is
         }
 
         emit Redeem(msg.sender, vaultShares, assets, assetAmounts);
+    }
+
+    function setRefillRatePerSecond(uint64 refillRate) external onlyGovernor {
+        emit RefillRateUpdated(rateLimit.refillRate, refillRate);
+        rateLimit.refillRate = refillRate;
+    }
+    
+    function setRateLimitCapacity(uint64 capacity) external onlyGovernor {
+        emit RateLimitCapacityUpdated(rateLimit.capacity, capacity);
+        rateLimit.capacity = capacity;
     }
 
     function previewDeposit(
@@ -384,10 +421,11 @@ contract LrtSquare is
         uint256 valueInEth,
         Math.Rounding rounding
     ) public view virtual returns (uint256) {
+        uint256 _totalSupply = totalSupply();
         return
             valueInEth.mulDiv(
-                totalSupply() + 10 ** _decimalsOffset(),
-                getVaultTokenValuesInEth(totalSupply()) + 1,
+                _totalSupply + 10 ** _decimalsOffset(),
+                getVaultTokenValuesInEth(_totalSupply) + 1,
                 rounding
             );
     }
