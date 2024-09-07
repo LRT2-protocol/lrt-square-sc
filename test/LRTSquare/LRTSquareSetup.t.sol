@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {Test} from "forge-std/Test.sol";
+import {Utils} from "../Utils.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {LrtSquare, Governable} from "../../src/LrtSquare.sol";
@@ -23,7 +23,7 @@ interface IPriceProvider {
     function setPrice(address token, uint256 price) external;
 }
 
-contract LRTSquareTestSetup is Test {
+contract LRTSquareTestSetup is Utils {
     using SafeERC20 for IERC20;
 
     LrtSquare public lrtSquare;
@@ -35,6 +35,8 @@ contract LRTSquareTestSetup is Test {
     address public owner = vm.addr(1);
     address public alice = vm.addr(2);
     address public bob = vm.addr(3);
+    address public rebalancer = vm.addr(4);
+    address public swapper = vm.addr(5);
 
     address public merkleDistributor = vm.addr(1000);
 
@@ -63,7 +65,7 @@ contract LRTSquareTestSetup is Test {
         lrtSquare = LrtSquare(
             address(new UUPSProxy(address(new LrtSquare()), ""))
         );
-        lrtSquare.initialize("LrtSquare", "LRT", address(timelock));
+        lrtSquare.initialize("LrtSquare", "LRT", address(timelock), rebalancer, swapper);
 
         tokenDecimals.push(18);
         tokenDecimals.push(12);

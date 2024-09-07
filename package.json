@@ -1,0 +1,19 @@
+{
+    "name": "lrt-square-contracts",
+    "version": "v0.5",
+    "license": "MIT",
+    "scripts": {
+      "build": "forge build",
+      "test": "forge test",
+      "compile": "forge compile"
+    },
+    "dependencies": {
+      "axios": "^1.7.3",
+      "dotenv": "^16.4.5",
+      "ethers": "^5.7.2"
+    },
+    "devDependencies": {
+      "@types/node": "^22.1.0"
+    }  
+}
+  

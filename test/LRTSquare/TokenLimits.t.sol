@@ -3,7 +3,6 @@ pragma solidity ^0.8.25;
 
 import {LRTSquareTestSetup, LrtSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
 import {BucketLimiter} from "../../src/libraries/BucketLimiter.sol";
-import {console} from "forge-std/console.sol";
 
 contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
     uint256 initialDepositToken0 = 100 ether;
@@ -105,11 +104,9 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
 
         // currently in the setup, the vault contains a 100% of `tokens[0]` 
         uint256 currentTotalValueInVault = (amounts[0] * tokenPrices[0]) / 1 ether; // 100% value
-        console.log("currentTotalValueInVault: ", currentTotalValueInVault);
 
         // breaking into 50/50, we need to supply equal value of `tokens[1]` so that both are 50/50
         uint256 amountToken1 = (currentTotalValueInVault * 10 ** tokenDecimals[1]) / tokenPrices[1];        
-        console.log("amountToken1: ", amountToken1);
 
         address[] memory assetsToSupply = new address[](1);
         assetsToSupply[0] = address(tokens[1]);

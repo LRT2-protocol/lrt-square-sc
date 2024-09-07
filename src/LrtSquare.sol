@@ -10,6 +10,7 @@ import {IPriceProvider} from "src/interfaces/IPriceProvider.sol";
 import {Governable} from "./governance/Governable.sol";
 import {BucketLimiter} from "./libraries/BucketLimiter.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {ISwapper} from "./interfaces/ISwapper.sol";
 
 /*
     AVSs pay out rewards to stakers in their ERC20 tokens.
@@ -44,6 +45,10 @@ contract LrtSquare is
     address[] public tokens;
     address public priceProvider;
     BucketLimiter.Limit private rateLimit;
+    address public rebalancer;
+    mapping(address swapOutputTokens => bool isWhitelisted) public isValidRebalanceOutputToken;
+    uint256 public maxAcceptableSlippageForRebalancing; // in 18 decimals
+    address public swapper; 
 
     uint64 public constant HUNDRED_PERCENT_LIMIT = 1_000_000_000;
 
@@ -68,6 +73,11 @@ contract LrtSquare is
     event RefillRateUpdated(uint64 oldRate, uint64 newRate);
     event RateLimitCapacityUpdated(uint64 oldCapacity, uint64 newCapacity);
     event TokenMaxPercentageLimitUpdated(uint64 oldPercentage, uint64 newPercentage);
+    event RebalancerSet(address oldRebalancer, address newRebalancer);
+    event MaxSlippageForRebalanceSet(uint256 oldMaxSlippage, uint256 newMaxSlippage);
+    event WhitelistRebalanceOutputToken(address token, bool whitelisted);
+    event SwapperSet(address oldSwapper, address newSwapper);
+    event Rebalance(address fromAsset, address toAsset, uint256 fromAssetAmount,uint256 toAssetAmount);
 
     error TokenAlreadyRegistered();
     error TokenNotWhitelisted();
@@ -85,6 +95,10 @@ contract LrtSquare is
     error RateLimitRefillRateCannotBeGreaterThanCapacity();
     error PercentageCannotBeGreaterThanHundred();
     error TokenMaxPercentageBreached();
+    error OnlyRebalancer();
+    error NotAValidRebalanceOutputToken();
+    error InsufficientTokensReceivedFromSwapper();
+    error ApplicableSlippageGreaterThanMaxLimit();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -94,19 +108,26 @@ contract LrtSquare is
     function initialize(
         string memory __name,
         string memory __symbol,
-        address __governor
+        address __governor,
+        address __rebalancer,
+        address __swapper
     ) public initializer {
         __ERC20_init(__name, __symbol);
         __ERC20Permit_init(__name);
         __UUPSUpgradeable_init();
 
         _setGovernor(__governor);
+        rebalancer = __rebalancer;
+        swapper = __swapper;
 
         // 1_000_000_000 = 100% for limiter
         // Limit = 3_000_000_000 -> 300% of total suppply, refill rate -> 1_000_000 -> 0.1%, so will be refilled in 3000 sec (50 mins)
         rateLimit = BucketLimiter.create(3_000_000_000, 1_000_000);
         emit RateLimitCapacityUpdated(0, 3_000_000_000);
         emit RefillRateUpdated(0, 1_000_000);
+
+        // 0.5%
+        maxAcceptableSlippageForRebalancing = 0.995 ether;
     }
 
     function mint(address to, uint256 shareToMint) external onlyGovernor {
@@ -116,6 +137,53 @@ contract LrtSquare is
     function getRateLimit() external view returns (BucketLimiter.Limit memory) {
         return rateLimit.getCurrent();
     } 
+
+    function whitelistRebalacingOutputToken(address _token, bool _shouldWhitelist) external onlyGovernor {
+        if (_token == address(0)) revert InvalidValue();
+        if (_shouldWhitelist) {
+            if(!isTokenRegistered(_token)) revert TokenNotRegistered();
+            if (IPriceProvider(priceProvider).getPriceInEth(_token) == 0)
+                revert PriceProviderNotConfigured();
+        }
+
+        isValidRebalanceOutputToken[_token] = _shouldWhitelist;
+        emit WhitelistRebalanceOutputToken(_token, _shouldWhitelist);
+    }
+
+    function setSwapper(address _swapper) external onlyGovernor {
+        if (_swapper == address(0)) revert InvalidValue();
+        emit SwapperSet(swapper, _swapper);
+        swapper = _swapper;
+    } 
+
+    function rebalance(
+        address _fromAsset,
+        address _toAsset,
+        uint256 _fromAssetAmount,
+        uint256 _minToAssetAmount,
+        bytes calldata _data
+    ) external onlyRebalancer {
+        if (!isTokenRegistered(_fromAsset) || !isTokenRegistered(_toAsset)) revert TokenNotRegistered();
+        // Input token may have been removed from whitelist to pause deposits for that token
+        if (!isTokenWhitelisted(_toAsset)) revert TokenNotWhitelisted();
+        if (!isValidRebalanceOutputToken[_toAsset]) revert NotAValidRebalanceOutputToken();
+        
+        uint256 vaultTotalValueBefore = getVaultTokenValuesInEth(totalSupply());
+        uint256 toAssetAmountBefore = IERC20(_toAsset).balanceOf(address(this));
+        IERC20(_fromAsset).safeTransfer(swapper, _fromAssetAmount);
+        uint256 outAmount = ISwapper(swapper).swap(_fromAsset, _toAsset, _fromAssetAmount, _minToAssetAmount, _data);
+
+        uint256 vaultTotalValueAfter = getVaultTokenValuesInEth(totalSupply());
+        uint256 toAssetAmountAfter = IERC20(_toAsset).balanceOf(address(this));
+
+        if (toAssetAmountAfter - toAssetAmountBefore < _minToAssetAmount) revert InsufficientTokensReceivedFromSwapper();
+        if (vaultTotalValueAfter < vaultTotalValueBefore) {
+            uint256 slippageApplicableInPercentage = ((vaultTotalValueBefore - vaultTotalValueAfter) * 100 ether) / vaultTotalValueBefore;
+            if (slippageApplicableInPercentage > maxAcceptableSlippageForRebalancing) revert ApplicableSlippageGreaterThanMaxLimit();
+        }
+
+        emit Rebalance(_fromAsset, _toAsset, _fromAssetAmount, outAmount);
+    }
 
     function registerToken(address _token, uint64 _maxPercentageInVault) external onlyGovernor {
         if (_token == address(0)) revert InvalidValue();
@@ -129,6 +197,18 @@ contract LrtSquare is
 
         emit TokenRegistered(_token);
         emit TokenWhitelisted(_token, true);
+    }
+
+    function setRebalancer(address account) external onlyGovernor {
+        if (account == address(0)) revert InvalidValue();
+        emit RebalancerSet(rebalancer, account);
+        rebalancer = account;
+    }
+
+    function setMaxAcceptableSlippageForRebalancing(uint256 maxSlippage) external onlyRebalancer {
+        if (maxSlippage == 0) revert InvalidValue();
+        emit MaxSlippageForRebalanceSet(maxAcceptableSlippageForRebalancing, maxSlippage);
+        maxAcceptableSlippageForRebalancing = maxSlippage;
     }
     
     function updateWhitelist(
@@ -530,4 +610,15 @@ contract LrtSquare is
     function _onlyDepositors() internal view {
         if (!depositor[msg.sender]) revert OnlyDepositors();
     }
+
+    modifier onlyRebalancer() {
+        _onlyRebalancer();
+        _;
+    }
+
+    function _onlyRebalancer() internal view {
+        if (rebalancer != msg.sender) revert OnlyRebalancer();
+    }
+
+
 }
