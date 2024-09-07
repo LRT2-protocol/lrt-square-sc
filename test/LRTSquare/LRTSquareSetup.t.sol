@@ -288,7 +288,7 @@ contract LRTSquareTestSetup is Utils {
         return bytes20(address(governance)) ^ descriptionHash;
     }
 
-    function _getAvsTokenValuesInEth(
+    function _getTokenValuesInEth(
         uint256[] memory _tokenIndices,
         uint256[] memory _amounts
     ) internal view returns (uint256) {

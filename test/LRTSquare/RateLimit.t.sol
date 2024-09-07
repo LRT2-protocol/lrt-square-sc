@@ -61,7 +61,7 @@ contract LRTSquareRateLimitTest is LRTSquareTestSetup {
         tokens[0].approve(address(lrtSquare), amountEqualToTheCapacity);
         amounts[0] = amountEqualToTheCapacity;
 
-        uint256 totalValueInEthAfterDeposit = _getAvsTokenValuesInEth(
+        uint256 totalValueInEthAfterDeposit = _getTokenValuesInEth(
             assetIndices,
             amounts
         );
@@ -94,7 +94,7 @@ contract LRTSquareRateLimitTest is LRTSquareTestSetup {
         tokens[0].approve(address(lrtSquare), amountEqualToTheCapacity);
         amounts[0] = amountEqualToTheCapacity;
 
-        uint256 totalValueInEthAfterDeposit = _getAvsTokenValuesInEth(
+        uint256 totalValueInEthAfterDeposit = _getTokenValuesInEth(
             assetIndices,
             amounts
         );

@@ -329,15 +329,15 @@ contract LrtSquare is
         address[] memory _tokens,
         uint256[] memory _amounts
     ) public view returns (uint256) {
-        uint256 rewardsValueInEth = getAvsTokenValuesInEth(_tokens, _amounts);
+        uint256 rewardsValueInEth = getTokenValuesInEth(_tokens, _amounts);
         return _convertToShares(rewardsValueInEth, Math.Rounding.Floor);
     }
 
     function assetOf(
         address user,
-        address avsToken
+        address token
     ) external view returns (uint256) {
-        return assetForVaultShares(balanceOf(user), avsToken);
+        return assetForVaultShares(balanceOf(user), token);
     }
 
     function assetsOf(
@@ -348,13 +348,13 @@ contract LrtSquare is
 
     function assetForVaultShares(
         uint256 vaultShares,
-        address avsToken
+        address token
     ) public view returns (uint256) {
-        if (!isTokenRegistered(avsToken)) revert TokenNotRegistered();
+        if (!isTokenRegistered(token)) revert TokenNotRegistered();
         if (totalSupply() == 0) revert TotalSupplyZero();
 
         return
-            _convertToAssetAmount(avsToken, vaultShares, Math.Rounding.Floor);
+            _convertToAssetAmount(token, vaultShares, Math.Rounding.Floor);
     }
 
     function assetsForVaultShares(
@@ -450,7 +450,7 @@ contract LrtSquare is
         return tokenInfos[token].whitelisted;
     }
 
-    function getAvsTokenValuesInEth(
+    function getTokenValuesInEth(
         address[] memory _tokens,
         uint256[] memory _amounts
     ) public view returns (uint256) {
@@ -476,7 +476,7 @@ contract LrtSquare is
         return total_eth;
     }
 
-    function getAvsTokenTotalValuesInEth(
+    function getTokenTotalValuesInEth(
         address token
     ) public view returns (uint256) {
         if (!isTokenRegistered(token)) revert TokenNotRegistered();
@@ -502,7 +502,7 @@ contract LrtSquare is
             address[] memory assets,
             uint256[] memory assetAmounts
         ) = totalAssets();
-        uint256 totalValue = getAvsTokenValuesInEth(assets, assetAmounts);
+        uint256 totalValue = getTokenValuesInEth(assets, assetAmounts);
         return (totalValue * vaultTokenShares) / totalSupply;
     }
 
@@ -512,7 +512,7 @@ contract LrtSquare is
         uint256 vaultTotalValue = getVaultTokenValuesInEth(totalSupply());
 
         for (uint256 i = 0; i < len; ) {
-            uint256 valueOfTokenInVault = getAvsTokenTotalValuesInEth(tokens[i]);
+            uint256 valueOfTokenInVault = getTokenTotalValuesInEth(tokens[i]);
             percentagesInVault[i] = SafeCast.toUint64((valueOfTokenInVault * HUNDRED_PERCENT_LIMIT) / vaultTotalValue);
             unchecked {
                 ++i;
@@ -589,7 +589,7 @@ contract LrtSquare is
         if(vaultTotalValue == 0) return;
 
         for (uint256 i = 0; i < len; ) {
-            uint256 valueOfTokenInVault = getAvsTokenTotalValuesInEth(tokens[i]);
+            uint256 valueOfTokenInVault = getTokenTotalValuesInEth(tokens[i]);
             percentagesInVault[i] = SafeCast.toUint64((valueOfTokenInVault * HUNDRED_PERCENT_LIMIT) / vaultTotalValue);
             if (percentagesInVault[i] > tokenInfos[tokens[i]].maxPercentageInVault) revert TokenMaxPercentageBreached();
             unchecked {

@@ -36,7 +36,7 @@ contract LRTSquareRedeemTest is LRTSquareTestSetup {
         _amounts.push(50 * 10 ** tokenDecimals[1]);
         _amounts.push(25 * 10 ** tokenDecimals[2]);
 
-        uint256 totalValueInEthAfterDeposit = _getAvsTokenValuesInEth(
+        uint256 totalValueInEthAfterDeposit = _getTokenValuesInEth(
             _tokenIndices,
             _amounts
         );
