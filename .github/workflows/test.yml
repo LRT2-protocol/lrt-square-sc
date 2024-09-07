@@ -33,16 +33,13 @@ jobs:
           cache: 'yarn'
 
       - name: Install Node.js dependencies
-        run: yarn install --immutable --immutable-cache --check-cache
+        run: make install-node-dependencies
 
       - name: Run Forge build
-        run: |
-          forge --version
-          forge build --sizes
+        run: make build
         id: build
 
       - name: Run Forge tests
-        run: |
-          forge test -vvv
+        run: make test
         id: test
 

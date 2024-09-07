@@ -382,7 +382,7 @@ contract LrtSquare is
             }
         }
 
-        assembly {
+        assembly ("memory-safe") {
             mstore(assets, cnt)
             mstore(assetAmounts, cnt)
         }
@@ -417,7 +417,7 @@ contract LrtSquare is
             }
         }
 
-        assembly {
+        assembly ("memory-safe") {
             mstore(assets, cnt)
             mstore(assetAmounts, cnt)
         }
