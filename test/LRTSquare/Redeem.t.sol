@@ -14,9 +14,9 @@ contract LRTSquareRedeemTest is LRTSquareTestSetup {
     function setUp() public override {
         super.setUp();
 
-        _registerToken(address(tokens[0]), tokenMaxPercentageValues[0], hex"");
-        _registerToken(address(tokens[1]), tokenMaxPercentageValues[1], hex"");
-        _registerToken(address(tokens[2]), tokenMaxPercentageValues[2], hex"");
+        _registerToken(address(tokens[0]), tokenPositionWeightLimits[0], hex"");
+        _registerToken(address(tokens[1]), tokenPositionWeightLimits[1], hex"");
+        _registerToken(address(tokens[2]), tokenPositionWeightLimits[2], hex"");
 
         address[] memory depositors = new address[](1);
         depositors[0] = alice;

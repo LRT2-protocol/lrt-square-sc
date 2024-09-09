@@ -16,8 +16,8 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
     function setUp() public override {
         super.setUp();
 
-        _registerToken(address(tokens[0]), tokenMaxPercentageValues[0], hex"");
-        _registerToken(address(tokens[1]), tokenMaxPercentageValues[1], hex"");
+        _registerToken(address(tokens[0]), tokenPositionWeightLimits[0], hex"");
+        _registerToken(address(tokens[1]), tokenPositionWeightLimits[1], hex"");
 
         address[] memory depositors = new address[](1);
         depositors[0] = owner;
@@ -63,14 +63,14 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
 
         // 1 gwei is 100% 
         uint64 newMaxPercentage = 0.1 gwei; // 10%
-        _updateMaxPercentageInVault(address(tokens[0]), newMaxPercentage, hex"");
+        _updateTokenPositionWeightLimit(address(tokens[0]), newMaxPercentage, hex"");
 
         ( , , uint64 maxPercentageAfter) = lrtSquare.tokenInfos(address(tokens[0]));
         assertEq(maxPercentageAfter, newMaxPercentage);
     }
 
     function test_CannotSetMaxPercentageForATokenIfTokenIsAddressZero() public {
-        _updateMaxPercentageInVault(
+        _updateTokenPositionWeightLimit(
             address(0), 
             1, 
             abi.encodeWithSelector(LrtSquare.InvalidValue.selector)
@@ -78,7 +78,7 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
     }
 
     function test_CannotSetMaxPercentageForATokenIfTokenNotRegistered() public {
-        _updateMaxPercentageInVault(
+        _updateTokenPositionWeightLimit(
             address(1), 
             1, 
             abi.encodeWithSelector(LrtSquare.TokenNotRegistered.selector)
@@ -86,10 +86,10 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
     }
 
     function test_CannotSetMaxPercentageForATokenIfPercentageIsGreaterThanHundred() public {
-        _updateMaxPercentageInVault(
+        _updateTokenPositionWeightLimit(
             address(tokens[0]), 
             lrtSquare.HUNDRED_PERCENT_LIMIT() + 1, 
-            abi.encodeWithSelector(LrtSquare.PercentageCannotBeGreaterThanHundred.selector)
+            abi.encodeWithSelector(LrtSquare.WeightLimitCannotBeGreaterThanHundred.selector)
         );
     }
 
@@ -100,8 +100,8 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
         uint64 newPercentageForToken0 = 0.5 gwei; // 50% of vault total value max
         uint64 newPercentageForToken1 = 0.5 gwei; // 50% of vault total value max
 
-        _updateMaxPercentageInVault(address(tokens[0]), newPercentageForToken0, hex"");
-        _updateMaxPercentageInVault(address(tokens[1]), newPercentageForToken1, hex"");
+        _updateTokenPositionWeightLimit(address(tokens[0]), newPercentageForToken0, hex"");
+        _updateTokenPositionWeightLimit(address(tokens[1]), newPercentageForToken1, hex"");
 
         // currently in the setup, the vault contains a 100% of `tokens[0]` 
         uint256 currentTotalValueInVault = (amounts[0] * tokenPrices[0]) / 1 ether; // 100% value
@@ -121,7 +121,7 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
         lrtSquare.deposit(assetsToSupply, amountsToSupply, merkleDistributor);
         vm.stopPrank(); 
 
-        uint64[] memory percentages = lrtSquare.getPercentagesInVault();
+        ( , uint64[] memory percentages) = lrtSquare.positionWeightLimit();
         assertEq(percentages[0], 0.5 gwei);
         assertEq(percentages[1], 0.5 gwei);
     }
@@ -133,8 +133,8 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
         uint64 newPercentageForToken0 = 0.5 gwei; // 50% of vault total value max
         uint64 newPercentageForToken1 = 0.5 gwei; // 50% of vault total value max
 
-        _updateMaxPercentageInVault(address(tokens[0]), newPercentageForToken0, hex"");
-        _updateMaxPercentageInVault(address(tokens[1]), newPercentageForToken1, hex"");
+        _updateTokenPositionWeightLimit(address(tokens[0]), newPercentageForToken0, hex"");
+        _updateTokenPositionWeightLimit(address(tokens[1]), newPercentageForToken1, hex"");
 
         // currently in the setup, the vault contains a 100% of `tokens[0]` 
         uint256 currentTotalValueInVault = (amounts[0] * tokenPrices[0]) / 1 ether; // 100% value
@@ -150,7 +150,7 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
         
         vm.startPrank(owner);
         tokens[1].approve(address(lrtSquare), initialDepositToken0);
-        vm.expectRevert(LrtSquare.TokenMaxPercentageBreached.selector);
+        vm.expectRevert(LrtSquare.TokenWeightLimitBreached.selector);
         lrtSquare.deposit(assetsToSupply, amountsToSupply, merkleDistributor);
         vm.stopPrank(); 
     }

@@ -4,3 +4,4 @@ cache/
 .env
 
 .vscode
+node_modules

@@ -36,7 +36,7 @@ contract LrtSquare is
     struct TokenInfo {
         bool registered;
         bool whitelisted;
-        uint64 maxPercentageInVault;
+        uint64 positionWeightLimit;
     }
 
     mapping(address => TokenInfo) public tokenInfos;
@@ -67,7 +67,7 @@ contract LrtSquare is
     );
     event RefillRateUpdated(uint64 oldRate, uint64 newRate);
     event RateLimitCapacityUpdated(uint64 oldCapacity, uint64 newCapacity);
-    event TokenMaxPercentageLimitUpdated(uint64 oldPercentage, uint64 newPercentage);
+    event TokenMaxPositionWeightLimitUpdated(uint64 oldLimit, uint64 newLimit);
 
     error TokenAlreadyRegistered();
     error TokenNotWhitelisted();
@@ -83,8 +83,8 @@ contract LrtSquare is
     error PriceProviderFailed();
     error RateLimitExceeded();
     error RateLimitRefillRateCannotBeGreaterThanCapacity();
-    error PercentageCannotBeGreaterThanHundred();
-    error TokenMaxPercentageBreached();
+    error WeightLimitCannotBeGreaterThanHundred();
+    error TokenWeightLimitBreached();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -117,14 +117,14 @@ contract LrtSquare is
         return rateLimit.getCurrent();
     } 
 
-    function registerToken(address _token, uint64 _maxPercentageInVault) external onlyGovernor {
+    function registerToken(address _token, uint64 _positionWeightLimit) external onlyGovernor {
         if (_token == address(0)) revert InvalidValue();
         if (isTokenRegistered(_token)) revert TokenAlreadyRegistered();
         if (IPriceProvider(priceProvider).getPriceInEth(_token) == 0)
             revert PriceProviderNotConfigured();
-        if (_maxPercentageInVault > HUNDRED_PERCENT_LIMIT) revert PercentageCannotBeGreaterThanHundred();
+        if (_positionWeightLimit > HUNDRED_PERCENT_LIMIT) revert WeightLimitCannotBeGreaterThanHundred();
 
-        tokenInfos[_token] = TokenInfo({registered: true, whitelisted: true, maxPercentageInVault: _maxPercentageInVault});
+        tokenInfos[_token] = TokenInfo({registered: true, whitelisted: true, positionWeightLimit: _positionWeightLimit});
         tokens.push(_token);
 
         emit TokenRegistered(_token);
@@ -141,12 +141,12 @@ contract LrtSquare is
         emit TokenWhitelisted(_token, _whitelist);
     }
 
-    function updateMaxPercentageInVault(address _token, uint64 _maxPercentageInVault) external onlyGovernor {
+    function updateTokenPositionWeightLimit(address _token, uint64 _TokenPositionWeightLimit) external onlyGovernor {
         if (_token == address(0)) revert InvalidValue();
         if (!isTokenRegistered(_token)) revert TokenNotRegistered();
-        if (_maxPercentageInVault > HUNDRED_PERCENT_LIMIT) revert PercentageCannotBeGreaterThanHundred();
-        emit TokenMaxPercentageLimitUpdated(tokenInfos[_token].maxPercentageInVault, _maxPercentageInVault);
-        tokenInfos[_token].maxPercentageInVault = _maxPercentageInVault;
+        if (_TokenPositionWeightLimit > HUNDRED_PERCENT_LIMIT) revert WeightLimitCannotBeGreaterThanHundred();
+        emit TokenMaxPositionWeightLimitUpdated(tokenInfos[_token].positionWeightLimit, _TokenPositionWeightLimit);
+        tokenInfos[_token].positionWeightLimit = _TokenPositionWeightLimit;
     }
 
     function setDepositors(
@@ -214,7 +214,7 @@ contract LrtSquare is
         
         _deposit(_tokens, _amounts, shareToMint, _receiver);
 
-        _checkPercentagesInVault();
+        _verifyPositionLimits();
 
         uint256 after_VaultTokenValue = getVaultTokenValuesInEth(
             1 * 10 ** decimals()
@@ -426,20 +426,29 @@ contract LrtSquare is
         return (totalValue * vaultTokenShares) / totalSupply;
     }
 
-    function getPercentagesInVault() public view returns (uint64[] memory) {
+    function positionWeightLimit() public view returns (address[] memory, uint64[] memory) {
         uint256 len = tokens.length;
-        uint64[] memory percentagesInVault = new uint64[](len);
+        uint64[] memory positionWeightLimits = new uint64[](len);
         uint256 vaultTotalValue = getVaultTokenValuesInEth(totalSupply());
 
         for (uint256 i = 0; i < len; ) {
-            uint256 valueOfTokenInVault = getAvsTokenTotalValuesInEth(tokens[i]);
-            percentagesInVault[i] = SafeCast.toUint64((valueOfTokenInVault * HUNDRED_PERCENT_LIMIT) / vaultTotalValue);
+            positionWeightLimits[i] = _getPositionWeight(tokens[i], vaultTotalValue);
             unchecked {
                 ++i;
             }
         }
 
-        return percentagesInVault;
+        return (tokens, positionWeightLimits);
+    }
+
+    function getPositionWeight(address token) public view returns (uint64) {
+        uint256 vaultTotalValue = getVaultTokenValuesInEth(totalSupply());
+        return _getPositionWeight(token, vaultTotalValue);
+    }
+
+    function _getPositionWeight(address token, uint256 vaultTotalValue) internal view returns (uint64) {
+        uint256 valueOfTokenInVault = getAvsTokenTotalValuesInEth(token);
+        return SafeCast.toUint64((valueOfTokenInVault * HUNDRED_PERCENT_LIMIT) / vaultTotalValue);
     }
 
 
@@ -501,17 +510,16 @@ contract LrtSquare is
         return IERC20Metadata(erc20).decimals();
     }
 
-    function _checkPercentagesInVault() internal view {
+    function _verifyPositionLimits() internal view {
         uint256 len = tokens.length;
-        uint64[] memory percentagesInVault = new uint64[](len);
+        uint64[] memory positionWeightLimits = new uint64[](len);
         uint256 vaultTotalValue = getVaultTokenValuesInEth(totalSupply());
 
         if(vaultTotalValue == 0) return;
 
         for (uint256 i = 0; i < len; ) {
-            uint256 valueOfTokenInVault = getAvsTokenTotalValuesInEth(tokens[i]);
-            percentagesInVault[i] = SafeCast.toUint64((valueOfTokenInVault * HUNDRED_PERCENT_LIMIT) / vaultTotalValue);
-            if (percentagesInVault[i] > tokenInfos[tokens[i]].maxPercentageInVault) revert TokenMaxPercentageBreached();
+            positionWeightLimits[i] = _getPositionWeight(tokens[i], vaultTotalValue);
+            if (positionWeightLimits[i] > tokenInfos[tokens[i]].positionWeightLimit) revert TokenWeightLimitBreached();
             unchecked {
                 ++i;
             }

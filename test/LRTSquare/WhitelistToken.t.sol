@@ -6,7 +6,7 @@ import {LRTSquareTestSetup, LrtSquare} from "./LRTSquareSetup.t.sol";
 contract LRTSquareWhitelistTokenTest is LRTSquareTestSetup {
     function setUp() public override {
         super.setUp();
-        _registerToken(address(tokens[0]), tokenMaxPercentageValues[0], hex"");
+        _registerToken(address(tokens[0]), tokenPositionWeightLimits[0], hex"");
     }
 
     function test_WhitelistTokenWithGovernance() public {

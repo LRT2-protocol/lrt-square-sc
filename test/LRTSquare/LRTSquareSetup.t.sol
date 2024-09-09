@@ -43,7 +43,7 @@ contract LRTSquareTestSetup is Test {
     Timelock timelock;
 
     uint256[] tokenPrices;
-    uint256[] tokenMaxPercentageValues;
+    uint256[] tokenPositionWeightLimits;
     uint8[] tokenDecimals;
 
     function setUp() public virtual {
@@ -73,9 +73,9 @@ contract LRTSquareTestSetup is Test {
         tokenPrices.push(0.5 ether);
         tokenPrices.push(0.01 ether);
 
-        tokenMaxPercentageValues.push(lrtSquare.HUNDRED_PERCENT_LIMIT());
-        tokenMaxPercentageValues.push(lrtSquare.HUNDRED_PERCENT_LIMIT());
-        tokenMaxPercentageValues.push(lrtSquare.HUNDRED_PERCENT_LIMIT());
+        tokenPositionWeightLimits.push(lrtSquare.HUNDRED_PERCENT_LIMIT());
+        tokenPositionWeightLimits.push(lrtSquare.HUNDRED_PERCENT_LIMIT());
+        tokenPositionWeightLimits.push(lrtSquare.HUNDRED_PERCENT_LIMIT());
 
         tokens.push(new MockERC20("Token1", "TK1", tokenDecimals[0]));
         tokens.push(new MockERC20("Token2", "TK2", tokenDecimals[1]));
@@ -175,20 +175,20 @@ contract LRTSquareTestSetup is Test {
         _executeGovernance(data, description, revertData);
     }
 
-    function _updateMaxPercentageInVault(
+    function _updateTokenPositionWeightLimit(
         address token, 
         uint64 maxPercentage, 
         bytes memory revertData
     ) internal {
         string memory description = string(
             abi.encodePacked(
-                "Proposal: update max percentage for token: ", 
+                "Proposal: update token position weight limits for token: ", 
                 vm.toString(token)
             )
         );
 
         bytes memory data = abi.encodeWithSelector(
-            LrtSquare.updateMaxPercentageInVault.selector,
+            LrtSquare.updateTokenPositionWeightLimit.selector,
             token,
             maxPercentage
         );
