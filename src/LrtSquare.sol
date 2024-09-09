@@ -116,8 +116,8 @@ contract LrtSquare is
     error PriceProviderFailed();
     error CommunityPauseDepositNotSet();
     error IncorrectAmountOfEtherSent();
-    error WithdrawCommunityDepositedPauseAmountBeforeUnpausing();
     error EtherTransferFailed();
+    error NoCommunityPauseDepositAvailable();
     error RateLimitExceeded();
     error RateLimitRefillRateCannotBeGreaterThanCapacity();
     error WeightLimitCannotBeGreaterThanHundred();
@@ -551,21 +551,25 @@ contract LrtSquare is
     }
 
     function unpause() external onlyRole(PAUSER_ROLE) whenPaused {
-        if (communityPauseDepositedAmt != 0)
-            revert WithdrawCommunityDepositedPauseAmountBeforeUnpausing();
+        uint256 amount = communityPauseDepositedAmt;
+        if (amount != 0) {
+            communityPauseDepositedAmt = 0;
+            _withdrawEth(msg.sender, amount);
+            emit CommunityPauseAmountWithdrawal(msg.sender, amount);
+        }
 
         _unpause();
     }
 
     function withdrawCommunityDepositedPauseAmount()
-        external
+        public
         onlyRole(PAUSER_ROLE)
     {
         uint256 amount = communityPauseDepositedAmt;
-        communityPauseDepositedAmt = 0;
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
 
-        if (!success) revert EtherTransferFailed();
+        if (amount == 0) revert NoCommunityPauseDepositAvailable();
+        communityPauseDepositedAmt = 0;
+        _withdrawEth(msg.sender, amount);
 
         emit CommunityPauseAmountWithdrawal(msg.sender, amount);
     }
@@ -673,6 +677,11 @@ contract LrtSquare is
                 ++i;
             }
         }
+    }
+
+    function _withdrawEth(address recipient, uint256 amount) internal {
+        (bool success, ) = payable(recipient).call{value: amount}("");
+        if (!success) revert EtherTransferFailed();
     }
 
     function _authorizeUpgrade(

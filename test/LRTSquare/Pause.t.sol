@@ -151,7 +151,7 @@ contract LRTSquarePauseTest is LRTSquareTestSetup {
         vm.stopPrank();
     }
 
-    function test_CannotUnpauseIfCommunityPauseDepositNotWithdrawn() public {
+    function test_CanUnpauseIfCommunityPauseDepositNotWithdrawn() public {
         uint256 depositAmt = 100 ether;
         vm.prank(address(timelock));
         lrtSquare.setCommunityPauseDepositAmount(depositAmt);
@@ -164,13 +164,14 @@ contract LRTSquarePauseTest is LRTSquareTestSetup {
 
         assertEq(lrtSquare.paused(), true);
 
+        uint256 balBefore = pauser.balance;
+
         vm.prank(pauser);
-        vm.expectRevert(
-            LrtSquare
-                .WithdrawCommunityDepositedPauseAmountBeforeUnpausing
-                .selector
-        );
         lrtSquare.unpause();
+
+        uint256 balAfter = pauser.balance;
+
+        assertGt(balAfter, balBefore);
     }
 
     function test_CannotDepositWhenPaused() public {
