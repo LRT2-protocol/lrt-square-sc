@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
 import {LRTSquareTestSetup, LrtSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
@@ -14,9 +14,9 @@ contract LRTSquareRedeemTest is LRTSquareTestSetup {
     function setUp() public override {
         super.setUp();
 
-        _registerToken(address(tokens[0]), hex"");
-        _registerToken(address(tokens[1]), hex"");
-        _registerToken(address(tokens[2]), hex"");
+        _registerToken(address(tokens[0]), tokenPositionWeightLimits[0], hex"");
+        _registerToken(address(tokens[1]), tokenPositionWeightLimits[1], hex"");
+        _registerToken(address(tokens[2]), tokenPositionWeightLimits[2], hex"");
 
         address[] memory depositors = new address[](1);
         depositors[0] = alice;
@@ -36,7 +36,7 @@ contract LRTSquareRedeemTest is LRTSquareTestSetup {
         _amounts.push(50 * 10 ** tokenDecimals[1]);
         _amounts.push(25 * 10 ** tokenDecimals[2]);
 
-        uint256 totalValueInEthAfterDeposit = _getAvsTokenValuesInEth(
+        uint256 totalValueInEthAfterDeposit = _getTokenValuesInEth(
             _tokenIndices,
             _amounts
         );
