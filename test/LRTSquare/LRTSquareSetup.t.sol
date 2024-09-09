@@ -11,6 +11,7 @@ import {GovernanceToken} from "../../src/governance/GovernanceToken.sol";
 import {LRTSquareGovernor} from "../../src/governance/Governance.sol";
 import {Timelock} from "../../src/governance/Timelock.sol";
 import {MockERC20} from "../../src/mocks/MockERC20.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 interface IPriceProvider {
     /// @notice Get the price of the token in ETH (18 decimals) for the token amount = 1 * 10 ** token.decimals()
@@ -26,6 +27,8 @@ interface IPriceProvider {
 contract LRTSquareTestSetup is Utils {
     using SafeERC20 for IERC20;
 
+    uint48 initialDelayForAccessControl = 100;
+    address pauser = makeAddr("pauser");
     LrtSquare public lrtSquare;
 
     MockERC20[] public tokens;
@@ -65,8 +68,16 @@ contract LRTSquareTestSetup is Utils {
         lrtSquare = LrtSquare(
             address(new UUPSProxy(address(new LrtSquare()), ""))
         );
-        lrtSquare.initialize("LrtSquare", "LRT", address(timelock), rebalancer, swapper);
-
+        lrtSquare.initialize(
+            "LrtSquare",
+            "LRT",
+            initialDelayForAccessControl,
+            address(timelock),
+            pauser,
+            rebalancer, 
+            swapper
+        );
+        
         tokenDecimals.push(18);
         tokenDecimals.push(12);
         tokenDecimals.push(6);
@@ -321,5 +332,17 @@ contract LRTSquareTestSetup is Utils {
         );
 
         return (valueInEth * (_totalSupply + 1)) / (_vaultTokenValuesInEth + 1);
+    }
+
+    function _buildAccessControlRevertData(
+        address account,
+        bytes32 role
+    ) internal pure returns (bytes memory) {
+        return
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                account,
+                role
+            );
     }
 }

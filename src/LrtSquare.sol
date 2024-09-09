@@ -8,6 +8,8 @@ import {ERC20PermitUpgradeable} from "@openzeppelin-upgradeable/contracts/token/
 import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {IPriceProvider} from "src/interfaces/IPriceProvider.sol";
 import {Governable} from "./governance/Governable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
+import {AccessControlDefaultAdminRulesUpgradeable} from "@openzeppelin-upgradeable/contracts/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import {BucketLimiter} from "./libraries/BucketLimiter.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ISwapper} from "./interfaces/ISwapper.sol";
@@ -28,6 +30,8 @@ contract LrtSquare is
     Initializable,
     Governable,
     ERC20PermitUpgradeable,
+    PausableUpgradeable,
+    AccessControlDefaultAdminRulesUpgradeable,
     UUPSUpgradeable
 {
     using BucketLimiter for BucketLimiter.Limit;
@@ -39,7 +43,9 @@ contract LrtSquare is
         bool whitelisted;
         uint64 positionWeightLimit;
     }
-    
+
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+
     mapping(address => TokenInfo) public tokenInfos;
     // only whitelisted depositors can deposit tokens into the vault
     mapping(address => bool) public depositor;
@@ -60,6 +66,9 @@ contract LrtSquare is
 
     uint64 public constant HUNDRED_PERCENT_LIMIT = 1_000_000_000;
 
+    uint256 public depositForCommunityPause;
+    uint256 public communityPauseDepositedAmt;
+
     event TokenRegistered(address token);
     event TokenWhitelisted(address token, bool whitelisted);
     event GovernorSet(address oldGovernor, address newGovernor);
@@ -77,6 +86,12 @@ contract LrtSquare is
         uint256 sharesRedeemed,
         address[] tokens,
         uint256[] amounts
+    );
+    event CommunityPauseDepositSet(uint256 oldAmount, uint256 newAmount);
+    event CommunityPause(address indexed pauser);
+    event CommunityPauseAmountWithdrawal(
+        address indexed withdrawer,
+        uint256 amount
     );
     event RefillRateUpdated(uint64 oldRate, uint64 newRate);
     event RateLimitCapacityUpdated(uint64 oldCapacity, uint64 newCapacity);
@@ -99,6 +114,10 @@ contract LrtSquare is
     error OnlyDepositors();
     error PriceProviderNotConfigured();
     error PriceProviderFailed();
+    error CommunityPauseDepositNotSet();
+    error IncorrectAmountOfEtherSent();
+    error EtherTransferFailed();
+    error NoCommunityPauseDepositAvailable();
     error RateLimitExceeded();
     error RateLimitRefillRateCannotBeGreaterThanCapacity();
     error WeightLimitCannotBeGreaterThanHundred();
@@ -116,13 +135,17 @@ contract LrtSquare is
     function initialize(
         string memory __name,
         string memory __symbol,
+        uint48 __accessControlDelay,
         address __governor,
+        address __pauser,
         address __rebalancer,
         address __swapper
     ) public initializer {
         __ERC20_init(__name, __symbol);
         __ERC20Permit_init(__name);
         __UUPSUpgradeable_init();
+        __AccessControlDefaultAdminRules_init(__accessControlDelay, __governor);
+        _grantRole(PAUSER_ROLE, __pauser);
 
         _setGovernor(__governor);
         rebalancer = __rebalancer;
@@ -283,7 +306,7 @@ contract LrtSquare is
         address[] memory _tokens,
         uint256[] memory _amounts,
         address _receiver
-    ) external onlyDepositors {
+    ) external whenNotPaused onlyDepositors {
         if (_tokens.length != _amounts.length) revert ArrayLengthMismatch();
         if (_receiver == address(0)) revert InvalidRecipient();
 
@@ -513,6 +536,50 @@ contract LrtSquare is
         return (totalValue * vaultTokenShares) / totalSupply;
     }
 
+    function communityPause() external payable whenNotPaused {
+        if (depositForCommunityPause == 0) revert CommunityPauseDepositNotSet();
+        if (msg.value != depositForCommunityPause)
+            revert IncorrectAmountOfEtherSent();
+
+        _pause();
+        communityPauseDepositedAmt = msg.value;
+        emit CommunityPause(msg.sender);
+    }
+
+    function pause() external onlyRole(PAUSER_ROLE) whenNotPaused {
+        _pause();
+    }
+
+    function unpause() external onlyRole(PAUSER_ROLE) whenPaused {
+        uint256 amount = communityPauseDepositedAmt;
+        if (amount != 0) {
+            communityPauseDepositedAmt = 0;
+            _withdrawEth(msg.sender, amount);
+            emit CommunityPauseAmountWithdrawal(msg.sender, amount);
+        }
+
+        _unpause();
+    }
+
+    function withdrawCommunityDepositedPauseAmount()
+        public
+        onlyRole(PAUSER_ROLE)
+    {
+        uint256 amount = communityPauseDepositedAmt;
+
+        if (amount == 0) revert NoCommunityPauseDepositAvailable();
+        communityPauseDepositedAmt = 0;
+        _withdrawEth(msg.sender, amount);
+
+        emit CommunityPauseAmountWithdrawal(msg.sender, amount);
+    }
+
+    function setCommunityPauseDepositAmount(
+        uint256 amount
+    ) external onlyGovernor {
+        emit CommunityPauseDepositSet(depositForCommunityPause, amount);
+        depositForCommunityPause = amount;
+    }
     function positionWeightLimit() public view returns (address[] memory, uint64[] memory) {
         uint256 len = tokens.length;
         uint64[] memory positionWeightLimits = new uint64[](len);
@@ -610,6 +677,11 @@ contract LrtSquare is
                 ++i;
             }
         }
+    }
+
+    function _withdrawEth(address recipient, uint256 amount) internal {
+        (bool success, ) = payable(recipient).call{value: amount}("");
+        if (!success) revert EtherTransferFailed();
     }
 
     function _authorizeUpgrade(
