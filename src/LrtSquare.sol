@@ -326,9 +326,8 @@ contract LrtSquare is
 
         _burn(msg.sender, vaultShares);
 
-        for (uint256 i = 0; i < assets.length; i++) {
-            IERC20(assets[i]).safeTransfer(msg.sender, assetAmounts[i]);
-        }
+        for (uint256 i = 0; i < assets.length; i++) 
+            if (assetAmounts[i] > 0) IERC20(assets[i]).safeTransfer(msg.sender, assetAmounts[i]);
 
         emit Redeem(msg.sender, vaultShares, assets, assetAmounts);
     }
