@@ -12,6 +12,13 @@ import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeE
 import {IAggregationExecutor, IOneInchRouterV6, SwapDescription} from "./interfaces/IOneInch.sol";
 import {ISwapper} from "./interfaces/ISwapper.sol";
 
+
+/**
+ * @title Swapper1InchV6
+ * @notice 1Inch Pathfinder V6 implementation of the general ISwapper interface.
+ * @notice Inspired by https://github.com/OriginProtocol/origin-dollar/blob/master/contracts/contracts/swapper/Swapper1InchV5.sol
+ * @notice This code is already well audited
+ */
 contract Swapper1InchV6 is ISwapper {
     using SafeERC20 for IERC20;
 
