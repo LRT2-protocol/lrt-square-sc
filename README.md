@@ -1,66 +1,30 @@
-## Foundry
+## LRT<sup>2</sup>
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+AVSs can distribute the restaking rewards in any ERC20 token. However, most of users will receive small, fractional amounts (more trouble than they’re worth to claim or trade in swap pools). It can lead to frustrating experiences and poor returns for stakers, while AVS may see a low token utilization and increased selling pressure.
 
-Foundry consists of:
-
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+LRT² (read as LRT Square) is a vault which holds the AVS tokens as underlying assets. Through LRT², LRT projects can pool AVS rewards into a single vault and issue vault share tokens to their stakers (or distributor contract). This system cuts transaction costs and streamlines the rewards process, great for those with smaller stakes who might find it easier to manage and trade their shares collectively. Larger stakeholders can redeem and possibly arbitrage, which will drive the market price of LRT² token.
 
 ## Documentation
 
-https://book.getfoundry.sh/
+https://lrt2.gitbook.io/lrt2
 
 ## Usage
 
-### Build
+#### Build
 
 ```shell
 $ forge build
 ```
 
-### Test
+#### Test
 
 ```shell
 $ forge test
 ```
 
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
+#### Gas Snapshots
 
 ```shell
 $ forge snapshot
 ```
 
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```

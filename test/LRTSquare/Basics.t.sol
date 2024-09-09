@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
 import {LRTSquareTestSetup, LrtSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
@@ -9,9 +9,9 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
     function setUp() public override {
         super.setUp();
 
-        _registerToken(address(tokens[0]), hex"");
-        _registerToken(address(tokens[1]), hex"");
-        _registerToken(address(tokens[2]), hex"");
+        _registerToken(address(tokens[0]), tokenPositionWeightLimits[0], hex"");
+        _registerToken(address(tokens[1]), tokenPositionWeightLimits[1], hex"");
+        _registerToken(address(tokens[2]), tokenPositionWeightLimits[2], hex"");
     }
 
     function test_Deploy() public {
@@ -44,7 +44,7 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         assertEq(_amounts, _amountsFromContract);
     }
 
-    function test_AvsTokenValuesInEth() public view {
+    function test_TokenValuesInEth() public view {
         uint256[] memory _tokenIndices = new uint256[](2);
         _tokenIndices[0] = 0;
         _tokenIndices[1] = 1;
@@ -57,18 +57,18 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         _amounts[0] = 1 * 10 ** tokenDecimals[_tokenIndices[0]];
         _amounts[1] = 5 * 10 ** tokenDecimals[_tokenIndices[1]];
 
-        uint256 expectedTotal = _getAvsTokenValuesInEth(
+        uint256 expectedTotal = _getTokenValuesInEth(
             _tokenIndices,
             _amounts
         );
 
         assertEq(
-            lrtSquare.getAvsTokenValuesInEth(_tokens, _amounts),
+            lrtSquare.getTokenValuesInEth(_tokens, _amounts),
             expectedTotal
         );
     }
 
-    function test_CannotGetAvsTokenValuesInEthIfArrayLengthMismatch() public {
+    function test_CannotGetTokenValuesInEthIfArrayLengthMismatch() public {
         address[] memory _tokens = new address[](2);
         _tokens[0] = address(tokens[0]);
         _tokens[1] = address(tokens[1]);
@@ -77,10 +77,10 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         _amounts[0] = 1 * 10 ** tokenDecimals[0];
 
         vm.expectRevert(LrtSquare.ArrayLengthMismatch.selector);
-        lrtSquare.getAvsTokenValuesInEth(_tokens, _amounts);
+        lrtSquare.getTokenValuesInEth(_tokens, _amounts);
     }
 
-    function test_CannotGetAvsTokenValuesInEthIfTokenNotRegistered() public {
+    function test_CannotGetTokenValuesInEthIfTokenNotRegistered() public {
         address[] memory _tokens = new address[](1);
         _tokens[0] = address(address(1));
 
@@ -88,10 +88,10 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         _amounts[0] = 1 ether;
 
         vm.expectRevert(LrtSquare.TokenNotRegistered.selector);
-        lrtSquare.getAvsTokenValuesInEth(_tokens, _amounts);
+        lrtSquare.getTokenValuesInEth(_tokens, _amounts);
     }
 
-    function test_CannotGetAvsTokenValuesInEthIfTokenNotWhitelisted() public {
+    function test_CannotGetTokenValuesInEthIfTokenNotWhitelisted() public {
         _updateWhitelist(address(tokens[0]), false, hex"");
 
         address[] memory _tokens = new address[](1);
@@ -101,7 +101,7 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         _amounts[0] = 1 * 10 ** tokenDecimals[0];
 
         vm.expectRevert(LrtSquare.TokenNotWhitelisted.selector);
-        lrtSquare.getAvsTokenValuesInEth(_tokens, _amounts);
+        lrtSquare.getTokenValuesInEth(_tokens, _amounts);
     }
 
     function test_PreviewDeposit() public {
@@ -117,12 +117,11 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         _amounts[0] = 1 * 10 ** tokenDecimals[_tokenIndices[0]];
         _amounts[1] = 5 * 10 ** tokenDecimals[_tokenIndices[1]];
 
-        uint256 totalValueInEth = _getAvsTokenValuesInEth(
+        uint256 totalValueInEth = _getTokenValuesInEth(
             _tokenIndices,
             _amounts
         );
         uint256 expectedShares = _getSharesForEth(totalValueInEth);
-
         assertApproxEqAbs(
             lrtSquare.previewDeposit(_tokens, _amounts),
             expectedShares,
@@ -134,7 +133,7 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         _amounts[0] = 10 * 10 ** tokenDecimals[_tokenIndices[0]];
         _amounts[1] = 500 * 10 ** tokenDecimals[_tokenIndices[1]];
 
-        uint256 totalValueInEthAfterDeposit = _getAvsTokenValuesInEth(
+        uint256 totalValueInEthAfterDeposit = _getTokenValuesInEth(
             _tokenIndices,
             _amounts
         );
@@ -163,7 +162,7 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         _amounts[1] = 5 * 10 ** tokenDecimals[_tokenIndices[1]];
 
         _deposit(_tokens, _amounts, alice);
-        uint256 totalValueInEth = _getAvsTokenValuesInEth(
+        uint256 totalValueInEth = _getTokenValuesInEth(
             _tokenIndices,
             _amounts
         );
@@ -232,7 +231,7 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         _amounts[1] = 5 * 10 ** tokenDecimals[_tokenIndices[1]];
 
         _deposit(_tokens, _amounts, alice);
-        uint256 totalValueInEth = _getAvsTokenValuesInEth(
+        uint256 totalValueInEth = _getTokenValuesInEth(
             _tokenIndices,
             _amounts
         );

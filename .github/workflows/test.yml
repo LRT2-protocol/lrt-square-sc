@@ -1,6 +1,10 @@
 name: test
 
-on: workflow_dispatch
+on:
+  pull_request:
+    branches:
+      - "master"
+    types: [opened, reopened, synchronize]
 
 env:
   FOUNDRY_PROFILE: ci
@@ -10,7 +14,7 @@ jobs:
     strategy:
       fail-fast: true
 
-    name: Foundry project
+    name: LRT Square project
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,13 +26,20 @@ jobs:
         with:
           version: nightly
 
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'yarn'
+
+      - name: Install Node.js dependencies
+        run: make install-node-dependencies
+
       - name: Run Forge build
-        run: |
-          forge --version
-          forge build --sizes
+        run: make build
         id: build
 
       - name: Run Forge tests
-        run: |
-          forge test -vvv
+        run: make test
         id: test
+

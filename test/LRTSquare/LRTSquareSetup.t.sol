@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {Test} from "forge-std/Test.sol";
+import {Utils} from "../Utils.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {LrtSquare, Governable} from "../../src/LrtSquare.sol";
@@ -24,7 +24,7 @@ interface IPriceProvider {
     function setPrice(address token, uint256 price) external;
 }
 
-contract LRTSquareTestSetup is Test {
+contract LRTSquareTestSetup is Utils {
     using SafeERC20 for IERC20;
 
     uint48 initialDelayForAccessControl = 100;
@@ -38,6 +38,8 @@ contract LRTSquareTestSetup is Test {
     address public owner = vm.addr(1);
     address public alice = vm.addr(2);
     address public bob = vm.addr(3);
+    address public rebalancer = vm.addr(4);
+    address public swapper = vm.addr(5);
 
     address public merkleDistributor = vm.addr(1000);
 
@@ -46,7 +48,7 @@ contract LRTSquareTestSetup is Test {
     Timelock timelock;
 
     uint256[] tokenPrices;
-
+    uint256[] tokenPositionWeightLimits;
     uint8[] tokenDecimals;
 
     function setUp() public virtual {
@@ -71,9 +73,11 @@ contract LRTSquareTestSetup is Test {
             "LRT",
             initialDelayForAccessControl,
             address(timelock),
-            pauser
+            pauser,
+            rebalancer, 
+            swapper
         );
-
+        
         tokenDecimals.push(18);
         tokenDecimals.push(12);
         tokenDecimals.push(6);
@@ -81,6 +85,10 @@ contract LRTSquareTestSetup is Test {
         tokenPrices.push(0.1 ether);
         tokenPrices.push(0.5 ether);
         tokenPrices.push(0.01 ether);
+
+        tokenPositionWeightLimits.push(lrtSquare.HUNDRED_PERCENT_LIMIT());
+        tokenPositionWeightLimits.push(lrtSquare.HUNDRED_PERCENT_LIMIT());
+        tokenPositionWeightLimits.push(lrtSquare.HUNDRED_PERCENT_LIMIT());
 
         tokens.push(new MockERC20("Token1", "TK1", tokenDecimals[0]));
         tokens.push(new MockERC20("Token2", "TK2", tokenDecimals[1]));
@@ -101,7 +109,7 @@ contract LRTSquareTestSetup is Test {
         lrtSquare.updatePriceProvider(address(priceProvider));
     }
 
-    function _registerToken(address token, bytes memory revertData) internal {
+    function _registerToken(address token, uint256 tokenMaxPercentage, bytes memory revertData) internal {
         string memory description = string(
             abi.encodePacked(
                 "Proposal: Register token: ",
@@ -113,7 +121,8 @@ contract LRTSquareTestSetup is Test {
 
         bytes memory data = abi.encodeWithSelector(
             LrtSquare.registerToken.selector,
-            token
+            token,
+            tokenMaxPercentage
         );
 
         _executeGovernance(data, description, revertData);
@@ -174,6 +183,55 @@ contract LRTSquareTestSetup is Test {
             LrtSquare.setDepositors.selector,
             depositors,
             isDepositor
+        );
+
+        _executeGovernance(data, description, revertData);
+    }
+
+    function _updateTokenPositionWeightLimit(
+        address token, 
+        uint64 maxPercentage, 
+        bytes memory revertData
+    ) internal {
+        string memory description = string(
+            abi.encodePacked(
+                "Proposal: update token position weight limits for token: ", 
+                vm.toString(token)
+            )
+        );
+
+        bytes memory data = abi.encodeWithSelector(
+            LrtSquare.updateTokenPositionWeightLimit.selector,
+            token,
+            maxPercentage
+        );
+
+        _executeGovernance(data, description, revertData);
+    }
+
+    function _setRateLimitCapacity(
+        uint64 capacity,
+        bytes memory revertData
+    ) internal {
+        string memory description = "Proposal: Set rate limit";
+
+        bytes memory data = abi.encodeWithSelector(
+            LrtSquare.setRateLimitCapacity.selector,
+            capacity
+        );
+
+        _executeGovernance(data, description, revertData);
+    }
+
+    function _setRateLimitRefillRate(
+        uint64 refillRate,
+        bytes memory revertData
+    ) internal {
+        string memory description = "Proposal: Set rate limit refill rate";
+
+        bytes memory data = abi.encodeWithSelector(
+            LrtSquare.setRefillRatePerSecond.selector,
+            refillRate
         );
 
         _executeGovernance(data, description, revertData);
@@ -241,7 +299,7 @@ contract LRTSquareTestSetup is Test {
         return bytes20(address(governance)) ^ descriptionHash;
     }
 
-    function _getAvsTokenValuesInEth(
+    function _getTokenValuesInEth(
         uint256[] memory _tokenIndices,
         uint256[] memory _amounts
     ) internal view returns (uint256) {
