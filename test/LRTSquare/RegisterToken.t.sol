@@ -6,7 +6,7 @@ import {LRTSquareTestSetup, LrtSquare} from "./LRTSquareSetup.t.sol";
 contract LRTSquareRegisterTokenTest is LRTSquareTestSetup {
     function test_RegisterTokenWithGovernance() public {
         assertEq(lrtSquare.isTokenRegistered(address(tokens[0])), false);
-        _registerToken(address(tokens[0]), tokenMaxPercentageValues[0], hex"");
+        _registerToken(address(tokens[0]), tokenPositionWeightLimits[0], hex"");
         assertEq(lrtSquare.isTokenRegistered(address(tokens[0])), true);
     }
 
@@ -45,7 +45,7 @@ contract LRTSquareRegisterTokenTest is LRTSquareTestSetup {
             address(tokens[0]),
             lrtSquare.HUNDRED_PERCENT_LIMIT() + 1,
             abi.encodeWithSelector(
-                LrtSquare.PercentageCannotBeGreaterThanHundred.selector
+                LrtSquare.WeightLimitCannotBeGreaterThanHundred.selector
             )
         );
     }

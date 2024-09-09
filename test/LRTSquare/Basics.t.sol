@@ -9,9 +9,9 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
     function setUp() public override {
         super.setUp();
 
-        _registerToken(address(tokens[0]), tokenMaxPercentageValues[0], hex"");
-        _registerToken(address(tokens[1]), tokenMaxPercentageValues[1], hex"");
-        _registerToken(address(tokens[2]), tokenMaxPercentageValues[2], hex"");
+        _registerToken(address(tokens[0]), tokenPositionWeightLimits[0], hex"");
+        _registerToken(address(tokens[1]), tokenPositionWeightLimits[1], hex"");
+        _registerToken(address(tokens[2]), tokenPositionWeightLimits[2], hex"");
     }
 
     function test_Deploy() public {

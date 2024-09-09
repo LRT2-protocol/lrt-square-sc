@@ -174,24 +174,24 @@ contract LRTSquareRebalanceTest is LRTSquareTestSetup {
         lrtSquare.setRebalancer(address(0));
     }
 
-    function test_OnlyRebalancerCanSetMaxAcceptableSlippage() public {
+    function test_OnlyRebalancerCanSetMaxSlippage() public {
         uint256 newMaxSlippage = 1 ether;
         vm.prank(alice);
         vm.expectRevert(LrtSquare.OnlyRebalancer.selector);
-        lrtSquare.setMaxAcceptableSlippageForRebalancing(newMaxSlippage);
+        lrtSquare.setMaxSlippageForRebalancing(newMaxSlippage);
 
         vm.startPrank(rebalancer);
         vm.expectEmit(true, true, true, true);
-        emit LrtSquare.MaxSlippageForRebalanceSet(lrtSquare.maxAcceptableSlippageForRebalancing(), newMaxSlippage);
-        lrtSquare.setMaxAcceptableSlippageForRebalancing(newMaxSlippage);
-        assertEq(lrtSquare.maxAcceptableSlippageForRebalancing(), newMaxSlippage);
+        emit LrtSquare.MaxSlippageForRebalanceSet(lrtSquare.maxSlippageForRebalancing(), newMaxSlippage);
+        lrtSquare.setMaxSlippageForRebalancing(newMaxSlippage);
+        assertEq(lrtSquare.maxSlippageForRebalancing(), newMaxSlippage);
         vm.stopPrank();
     }
 
     function test_MaxSlippageCannotBeZero() public {
         vm.prank(rebalancer);
         vm.expectRevert(LrtSquare.InvalidValue.selector);
-        lrtSquare.setMaxAcceptableSlippageForRebalancing(0);
+        lrtSquare.setMaxSlippageForRebalancing(0);
     }
 
     function test_OnlyGovernorCanWhitelistRebalanceOutputTokens() public {
@@ -203,7 +203,7 @@ contract LRTSquareRebalanceTest is LRTSquareTestSetup {
         vm.expectEmit(true, true, true, true);
         emit LrtSquare.WhitelistRebalanceOutputToken(weETH, true);
         lrtSquare.whitelistRebalacingOutputToken(weETH, true);
-        assertEq(lrtSquare.isValidRebalanceOutputToken(weETH), true);
+        assertEq(lrtSquare.isWhitelistedRebalanceOutputToken(weETH), true);
     }
 
     function test_CannotWhitelistAddressZeroAsRebalanceOutputToken() public {
