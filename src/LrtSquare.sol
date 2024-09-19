@@ -71,7 +71,6 @@ contract LrtSquare is
 
     event TokenRegistered(address token);
     event TokenWhitelisted(address token, bool whitelisted);
-    event GovernorSet(address oldGovernor, address newGovernor);
     event PriceProviderSet(address oldPriceProvider, address newPriceProvider);
     event DepositorsSet(address[] accounts, bool[] isDepositor);
     event Deposit(
@@ -607,15 +606,8 @@ contract LrtSquare is
         uint256 shareToMint,
         address recipientForMintedShare
     ) internal {
-        for (uint256 i = 0; i < _tokens.length; i++) {
-            if (!isTokenRegistered(_tokens[i])) revert TokenNotRegistered();
-
-            IERC20(_tokens[i]).safeTransferFrom(
-                msg.sender,
-                address(this),
-                amounts[i]
-            );
-        }
+        for (uint256 i = 0; i < _tokens.length; i++)
+            IERC20(_tokens[i]).safeTransferFrom(msg.sender, address(this), amounts[i]);
 
         _mint(recipientForMintedShare, shareToMint);
     }
@@ -656,14 +648,15 @@ contract LrtSquare is
 
     function _verifyPositionLimits() internal view {
         uint256 len = tokens.length;
-        uint64[] memory positionWeightLimits = new uint64[](len);
         uint256 vaultTotalValue = getVaultTokenValuesInEth(totalSupply());
 
         if(vaultTotalValue == 0) return;
 
         for (uint256 i = 0; i < len; ) {
-            positionWeightLimits[i] = _getPositionWeight(tokens[i], vaultTotalValue);
-            if (positionWeightLimits[i] > tokenInfos[tokens[i]].positionWeightLimit) revert TokenWeightLimitBreached(); {
+            if (_getPositionWeight(tokens[i], vaultTotalValue) > tokenInfos[tokens[i]].positionWeightLimit) 
+                revert TokenWeightLimitBreached(); 
+
+            unchecked {
                 ++i;
             }
         }
