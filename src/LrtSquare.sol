@@ -396,13 +396,6 @@ contract LrtSquare is
         uint256[] memory assetAmounts = new uint256[](len);
         uint256 cnt = 0;
         for (uint256 i = 0; i < len; ) {
-            if (!isTokenRegistered(tokens[i])) {
-                unchecked {
-                    ++i;
-                }
-                continue;
-            }
-
             assets[cnt] = tokens[i];
             assetAmounts[cnt] = assetForVaultShares(vaultShare, tokens[i]);
 
