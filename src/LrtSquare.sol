@@ -208,8 +208,8 @@ contract LrtSquare is
 
         if (toAssetAmountAfter - toAssetAmountBefore < _minToAssetAmount) revert InsufficientTokensReceivedFromSwapper();
         if (vaultTotalValueAfter < vaultTotalValueBefore) {
-            uint256 slippageApplicableInPercentage = ((vaultTotalValueBefore - vaultTotalValueAfter) * 100 * 1 ether) / vaultTotalValueBefore;
-            if (slippageApplicableInPercentage > maxSlippageForRebalancing) revert ApplicableSlippageGreaterThanMaxLimit();
+            uint256 minVaultTotalValueAfter = (vaultTotalValueBefore * maxSlippageForRebalancing) / 1 ether;
+            if (vaultTotalValueAfter < minVaultTotalValueAfter) revert ApplicableSlippageGreaterThanMaxLimit();
         }
 
         emit Rebalance(_fromAsset, _toAsset, _fromAssetAmount, outAmount);
