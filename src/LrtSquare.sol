@@ -46,19 +46,19 @@ contract LrtSquare is
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-    mapping(address => TokenInfo) public tokenInfos;
+    mapping(address => TokenInfo) public tokenInfos; 
     // only whitelisted depositors can deposit tokens into the vault
-    mapping(address => bool) public depositor;
+    mapping(address => bool) public depositor; 
     // address of accepted tokens
     address[] public tokens;
     // address of the price provider
     address public priceProvider;
     // rate limit on deposit amount
-    BucketLimiter.Limit private rateLimit;
+    BucketLimiter.Limit private rateLimit; 
     // address of the rebalancer
-    address public rebalancer;
+    address public rebalancer; 
     // tokens that are whitelisted as swap output tokens can only be the output of rebalancing
-    mapping(address swapOutputTokens => bool isWhitelisted) public isWhitelistedRebalanceOutputToken;
+    mapping(address swapOutputTokens => bool isWhitelisted) public isWhitelistedRebalanceOutputToken; 
     // max slippage acceptable when we rebalance (in 18 decimals)
     uint256 public maxSlippageForRebalancing; 
     // Swapper is a helper contract that helps us swap funds in the vault and rebalance 
@@ -198,7 +198,7 @@ contract LrtSquare is
         // Input token may have been removed from whitelist to pause deposits for that token
         if (!isTokenWhitelisted(_toAsset)) revert TokenNotWhitelisted();
         if (!isWhitelistedRebalanceOutputToken[_toAsset]) revert NotAValidRebalanceOutputToken();
-        
+
         uint256 vaultTotalValueBefore = getVaultTokenValuesInEth(totalSupply());
         uint256 toAssetAmountBefore = IERC20(_toAsset).balanceOf(address(this));
         IERC20(_fromAsset).safeTransfer(swapper, _fromAssetAmount);
@@ -217,7 +217,7 @@ contract LrtSquare is
     }
 
     function registerToken(address _token, uint64 _positionWeightLimit) external onlyGovernor {
-    if (_token == address(0)) revert InvalidValue();
+        if (_token == address(0)) revert InvalidValue();
         if (isTokenRegistered(_token)) revert TokenAlreadyRegistered();
         if (IPriceProvider(priceProvider).getPriceInEth(_token) == 0)
             revert PriceProviderNotConfigured();
@@ -322,7 +322,7 @@ contract LrtSquare is
             uint64 amountForLimit = SafeCast.toUint64((shareToMint * HUNDRED_PERCENT_LIMIT) / totalSupplyBeforeDeposit);
             if(!rateLimit.consume(amountForLimit)) revert RateLimitExceeded();
         } 
-        
+
         _deposit(_tokens, _amounts, shareToMint, _receiver);
 
         _verifyPositionLimits();
@@ -498,10 +498,7 @@ contract LrtSquare is
             );
             if (price == 0) revert PriceProviderFailed();
 
-            total_eth +=
-                (_amounts[i] *
-                    IPriceProvider(priceProvider).getPriceInEth(_tokens[i])) /
-                10 ** _getDecimals(_tokens[i]);
+            total_eth += (_amounts[i] * price) / 10 ** _getDecimals(_tokens[i]);
         }
         return total_eth;
     }
