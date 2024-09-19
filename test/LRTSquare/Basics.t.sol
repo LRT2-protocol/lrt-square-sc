@@ -91,19 +91,6 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         lrtSquare.getTokenValuesInEth(_tokens, _amounts);
     }
 
-    function test_CannotGetTokenValuesInEthIfTokenNotWhitelisted() public {
-        _updateWhitelist(address(tokens[0]), false, hex"");
-
-        address[] memory _tokens = new address[](1);
-        _tokens[0] = address(tokens[0]);
-
-        uint256[] memory _amounts = new uint256[](1);
-        _amounts[0] = 1 * 10 ** tokenDecimals[0];
-
-        vm.expectRevert(LrtSquare.TokenNotWhitelisted.selector);
-        lrtSquare.getTokenValuesInEth(_tokens, _amounts);
-    }
-
     function test_PreviewDeposit() public {
         uint256[] memory _tokenIndices = new uint256[](2);
         _tokenIndices[0] = 0;

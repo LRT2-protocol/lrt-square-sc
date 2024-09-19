@@ -296,7 +296,6 @@ contract LrtSquare is
         rateLimit.capacity = capacity;
     }
 
-
     /// @notice Deposit rewards to the contract and mint share tokens to the recipient.
     /// @param _tokens addresses of ERC20 tokens to deposit
     /// @param _amounts amounts of tokens to deposit
@@ -309,8 +308,8 @@ contract LrtSquare is
         if (_tokens.length != _amounts.length) revert ArrayLengthMismatch();
         if (_receiver == address(0)) revert InvalidRecipient();
 
-        bool initial_deposit = (totalSupply() == 0);
-        uint256 before_VaultTokenValue = getVaultTokenValuesInEth(
+        bool initialDeposit = (totalSupply() == 0);
+        uint256 VaultTokenValueBefore = getVaultTokenValuesInEth(
             1 * 10 ** decimals()
         );
 
@@ -326,11 +325,11 @@ contract LrtSquare is
 
         _verifyPositionLimits();
 
-        uint256 after_VaultTokenValue = getVaultTokenValuesInEth(
+        uint256 VaultTokenValueAfter = getVaultTokenValuesInEth(
             1 * 10 ** decimals()
         );
 
-        if (!initial_deposit && before_VaultTokenValue != after_VaultTokenValue)
+        if (!initialDeposit && VaultTokenValueBefore != VaultTokenValueAfter)
             revert VaultTokenValueChanged();
 
         emit Deposit(msg.sender, _receiver, shareToMint, _tokens, _amounts);
@@ -382,31 +381,22 @@ contract LrtSquare is
         if (!isTokenRegistered(token)) revert TokenNotRegistered();
         if (totalSupply() == 0) revert TotalSupplyZero();
 
-        return
-            _convertToAssetAmount(token, vaultShares, Math.Rounding.Floor);
+        return _convertToAssetAmount(token, vaultShares, Math.Rounding.Floor);
     }
 
     function assetsForVaultShares(
         uint256 vaultShare
     ) public view returns (address[] memory, uint256[] memory) {
         if (totalSupply() == 0) revert TotalSupplyZero();
-        uint256 len = tokens.length;
-        address[] memory assets = new address[](len);
+        address[] memory assets = tokens;
+        uint256 len = assets.length;
         uint256[] memory assetAmounts = new uint256[](len);
-        uint256 cnt = 0;
         for (uint256 i = 0; i < len; ) {
-            assets[cnt] = tokens[i];
-            assetAmounts[cnt] = assetForVaultShares(vaultShare, tokens[i]);
+            assetAmounts[i] = assetForVaultShares(vaultShare, assets[i]);
 
             unchecked {
-                ++cnt;
                 ++i;
             }
-        }
-
-        assembly ("memory-safe") {
-            mstore(assets, cnt)
-            mstore(assetAmounts, cnt)
         }
 
         return (assets, assetAmounts);
@@ -417,31 +407,14 @@ contract LrtSquare is
         view
         returns (address[] memory, uint256[] memory)
     {
-        uint256 len = tokens.length;
-        address[] memory assets = new address[](len);
+        address[] memory assets = tokens;
+        uint256 len = assets.length;
         uint256[] memory assetAmounts = new uint256[](len);
-        uint256 cnt = 0;
         for (uint256 i = 0; i < len; ) {
-            if (!isTokenWhitelisted(tokens[i])) {
-                unchecked {
-                    ++i;
-                }
-
-                continue;
-            }
-
-            assets[cnt] = tokens[i];
-            assetAmounts[cnt] = IERC20(tokens[i]).balanceOf(address(this));
-
+            assetAmounts[i] = IERC20(assets[i]).balanceOf(address(this));
             unchecked {
                 ++i;
-                ++cnt;
             }
-        }
-
-        assembly ("memory-safe") {
-            mstore(assets, cnt)
-            mstore(assetAmounts, cnt)
         }
 
         return (assets, assetAmounts);
@@ -456,9 +429,8 @@ contract LrtSquare is
         uint256 totalValue = 0;
         for (uint256 i = 0; i < assets.length; i++) {
             totalValue +=
-                (assetAmounts[i] *
-                    IPriceProvider(priceProvider).getPriceInEth(assets[i])) /
-                10 ** _getDecimals(assets[i]);
+                (assetAmounts[i] * IPriceProvider(priceProvider).getPriceInEth(assets[i])) /
+                    10 ** _getDecimals(assets[i]);
         }
 
         return totalValue;
@@ -481,16 +453,18 @@ contract LrtSquare is
 
         if (len != _amounts.length) revert ArrayLengthMismatch();
 
-        for (uint256 i = 0; i < _tokens.length; i++) {
+        for (uint256 i = 0; i < _tokens.length; ) {
             if (!isTokenRegistered(_tokens[i])) revert TokenNotRegistered();
-            if (!isTokenWhitelisted(_tokens[i])) revert TokenNotWhitelisted();
 
             uint256 price = IPriceProvider(priceProvider).getPriceInEth(
                 _tokens[i]
             );
             if (price == 0) revert PriceProviderFailed();
-
             total_eth += (_amounts[i] * price) / 10 ** _getDecimals(_tokens[i]);
+
+            unchecked {
+                ++i;
+            }
         }
         return total_eth;
     }
@@ -498,9 +472,6 @@ contract LrtSquare is
     function getTokenTotalValuesInEth(
         address token
     ) public view returns (uint256) {
-        if (!isTokenRegistered(token)) revert TokenNotRegistered();
-        if (!isTokenWhitelisted(token)) revert TokenNotWhitelisted();
-
         uint256 price = IPriceProvider(priceProvider).getPriceInEth(
             token
         );
@@ -585,6 +556,7 @@ contract LrtSquare is
     }
 
     function getPositionWeight(address token) public view returns (uint64) {
+        if (!isTokenRegistered(token)) revert TokenNotRegistered();
         uint256 vaultTotalValue = getVaultTokenValuesInEth(totalSupply());
         return _getPositionWeight(token, vaultTotalValue);
     }
@@ -606,8 +578,14 @@ contract LrtSquare is
         uint256 shareToMint,
         address recipientForMintedShare
     ) internal {
-        for (uint256 i = 0; i < _tokens.length; i++)
+        for (uint256 i = 0; i < _tokens.length; ) {
+            if (!isTokenWhitelisted(_tokens[i])) revert TokenNotWhitelisted(); 
             IERC20(_tokens[i]).safeTransferFrom(msg.sender, address(this), amounts[i]);
+
+            unchecked {
+                ++i;
+            }
+        }
 
         _mint(recipientForMintedShare, shareToMint);
     }
