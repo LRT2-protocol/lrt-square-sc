@@ -597,8 +597,8 @@ contract LrtSquare is
         uint256 _totalSupply = totalSupply();
         return
             valueInEth.mulDiv(
-                _totalSupply + 10 ** _decimalsOffset(),
-                getVaultTokenValuesInEth(_totalSupply) + 1,
+                _totalSupply == 0 ? 1 : _totalSupply,
+                _totalSupply == 0 ? 1 : getVaultTokenValuesInEth(_totalSupply),
                 rounding
             );
     }
@@ -608,16 +608,14 @@ contract LrtSquare is
         uint256 vaultShares,
         Math.Rounding rounding
     ) internal view virtual returns (uint256) {
+        uint256 bal = IERC20(assetToken).balanceOf(address(this));
+        uint256 _totalSupply = totalSupply();
         return
             vaultShares.mulDiv(
-                IERC20(assetToken).balanceOf(address(this)) + 1,
-                totalSupply() + 10 ** _decimalsOffset(),
+                bal == 0 ? 1 : bal,
+                _totalSupply == 0 ? 1 : _totalSupply,
                 rounding
             );
-    }
-
-    function _decimalsOffset() internal view virtual returns (uint8) {
-        return 0;
     }
 
     function _getDecimals(address erc20) internal view returns (uint8) {
