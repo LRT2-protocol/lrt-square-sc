@@ -212,6 +212,8 @@ contract LrtSquare is
             if (vaultTotalValueAfter < minVaultTotalValueAfter) revert ApplicableSlippageGreaterThanMaxLimit();
         }
 
+        _verifyPositionLimits();
+
         emit Rebalance(_fromAsset, _toAsset, _fromAssetAmount, outAmount);
     }
 
