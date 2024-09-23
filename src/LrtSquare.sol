@@ -597,12 +597,9 @@ contract LrtSquare is
         Math.Rounding rounding
     ) public view virtual returns (uint256) {
         uint256 _totalSupply = totalSupply();
-        return
-            valueInEth.mulDiv(
-                _totalSupply == 0 ? 1 : _totalSupply,
-                _totalSupply == 0 ? 1 : getVaultTokenValuesInEth(_totalSupply),
-                rounding
-            );
+        if (_totalSupply == 0) return valueInEth;
+        
+        return valueInEth.mulDiv(_totalSupply, getVaultTokenValuesInEth(_totalSupply), rounding);
     }
 
     function _convertToAssetAmount(
@@ -612,12 +609,11 @@ contract LrtSquare is
     ) internal view virtual returns (uint256) {
         uint256 bal = IERC20(assetToken).balanceOf(address(this));
         uint256 _totalSupply = totalSupply();
-        return
-            vaultShares.mulDiv(
-                bal == 0 ? 1 : bal,
-                _totalSupply == 0 ? 1 : _totalSupply,
-                rounding
-            );
+
+        if (_totalSupply == 0) _totalSupply = 1;
+        if (bal == 0) bal = 1;
+
+        return vaultShares.mulDiv(bal, _totalSupply, rounding);
     }
 
     function _getDecimals(address erc20) internal view returns (uint8) {
