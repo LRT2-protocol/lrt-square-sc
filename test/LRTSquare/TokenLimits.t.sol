@@ -2,11 +2,9 @@
 pragma solidity ^0.8.25;
 
 import {LRTSquareTestSetup, LrtSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
-import {BucketLimiter} from "../../src/libraries/BucketLimiter.sol";
 
 contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
     uint256 initialDepositToken0 = 100 ether;
-    BucketLimiter.Limit limit;
     
     uint256[] assetIndices;
     address[] assets;
@@ -52,8 +50,6 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
             100 * priceProvider.getPriceInEth(address(tokens[0]))
         ); // initial mint
         vm.stopPrank();
-
-        limit = lrtSquare.getRateLimit();
     }
 
     function test_SetMaxPercentageForATokenInVault() public {

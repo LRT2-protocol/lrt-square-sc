@@ -51,6 +51,8 @@ contract LRTSquareTestSetup is Utils {
     uint256[] tokenPositionWeightLimits;
     uint8[] tokenDecimals;
 
+    uint128 percentageRateLimit = 5_000_000_000; // 500%
+
     function setUp() public virtual {
         vm.startPrank(owner);
 
@@ -75,7 +77,8 @@ contract LRTSquareTestSetup is Utils {
             address(timelock),
             pauser,
             rebalancer, 
-            swapper
+            swapper,
+            percentageRateLimit
         );
         
         tokenDecimals.push(18);
@@ -209,22 +212,8 @@ contract LRTSquareTestSetup is Utils {
         _executeGovernance(data, description, revertData);
     }
 
-    function _setRateLimitCapacity(
-        uint64 capacity,
-        bytes memory revertData
-    ) internal {
-        string memory description = "Proposal: Set rate limit";
-
-        bytes memory data = abi.encodeWithSelector(
-            LrtSquare.setRateLimitCapacity.selector,
-            capacity
-        );
-
-        _executeGovernance(data, description, revertData);
-    }
-
     function _setRateLimitRefillRate(
-        uint64 refillRate,
+        uint128 refillRate,
         bytes memory revertData
     ) internal {
         string memory description = "Proposal: Set rate limit refill rate";
@@ -232,6 +221,52 @@ contract LRTSquareTestSetup is Utils {
         bytes memory data = abi.encodeWithSelector(
             LrtSquare.setRefillRatePerSecond.selector,
             refillRate
+        );
+
+        _executeGovernance(data, description, revertData);
+    }
+
+    function _setRateLimitTimePeriod(
+        uint64 timePeriod,
+        bytes memory revertData
+    ) internal {
+        string memory description = "Proposal: Set rate limit time period";
+
+        bytes memory data = abi.encodeWithSelector(
+            LrtSquare.setRateLimitTimePeriod.selector,
+            timePeriod
+        );
+
+        _executeGovernance(data, description, revertData);
+    }
+
+    function _setPercentageRateLimit(
+        uint128 percentageLimit,
+        bytes memory revertData
+    ) internal {
+        string memory description = "Proposal: Set rate limit percentage";
+
+        bytes memory data = abi.encodeWithSelector(
+            LrtSquare.setPercentageRateLimit.selector,
+            percentageLimit
+        );
+
+        _executeGovernance(data, description, revertData);
+    }
+
+    function _setRateLimitConfig(
+        uint128 __percentageLimit, 
+        uint64 __timePeriod, 
+        uint128 __refillRate,
+        bytes memory revertData
+    ) internal {
+        string memory description = "Proposal: Set rate limit config";
+
+        bytes memory data = abi.encodeWithSelector(
+            LrtSquare.setRateLimitConfig.selector,
+            __percentageLimit,
+            __timePeriod, 
+            __refillRate
         );
 
         _executeGovernance(data, description, revertData);

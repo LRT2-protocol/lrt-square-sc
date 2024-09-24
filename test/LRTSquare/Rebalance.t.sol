@@ -110,6 +110,9 @@ contract LRTSquareRebalanceTest is LRTSquareTestSetup {
     }
 
     function test_CanRebalance() public {
+        vm.prank(rebalancer);
+        lrtSquare.setMaxSlippageForRebalancing(0.9 ether); // 10% slippage so swap does not fail
+
         deal(address(weETH), alice, 1 ether);
 
         // Deposit funds into the contract

@@ -11,7 +11,7 @@ pragma solidity ^0.8.25;
  * second.
  * 
  * To limit storage usage to a single slot, the Bucket struct is packed into
- * a single word, meaning all fields are uint64.
+ * a single word, meaning all fields are uint128.
  *
  * Examples:
  *
@@ -41,13 +41,13 @@ pragma solidity ^0.8.25;
 library BucketLimiter {
     struct Limit {
         // The maximum capacity of the bucket, in consumable units (eg. tokens)
-        uint64 capacity;
+        uint128 capacity;
         // The remaining capacity in the bucket, that can be consumed
-        uint64 remaining;
+        uint128 remaining;
         // The timestamp of the last time the bucket was refilled
-        uint64 lastRefill;
+        uint128 lastRefill;
         // The rate at which the bucket refills, in units per second
-        uint64 refillRate;
+        uint128 refillRate;
     }
 
     /*
@@ -57,11 +57,11 @@ library BucketLimiter {
      * @param refillRate The rate at which the bucket refills, in units per second
      * @return The created bucket
      */
-    function create(uint64 capacity, uint64 refillRate) internal view returns (Limit memory) {
+    function create(uint128 capacity, uint128 refillRate) internal view returns (Limit memory) {
         return Limit({
             capacity: capacity,
             remaining: capacity,
-            lastRefill: uint64(block.timestamp),
+            lastRefill: uint128(block.timestamp),
             refillRate: refillRate
         });
     }
@@ -71,7 +71,7 @@ library BucketLimiter {
         return limit;
     }
 
-    function canConsume(Limit memory limit, uint64 amount) external view returns (bool) {
+    function canConsume(Limit memory limit, uint128 amount) external view returns (bool) {
         _refill(limit);
         return limit.remaining >= amount;
     }
@@ -84,7 +84,7 @@ library BucketLimiter {
      * @param amount The amount to consume
      * @return True if the bucket had enough remaining capacity to consume the amount, false otherwise
      */
-    function consume(Limit storage limit, uint64 amount) internal returns (bool) {
+    function consume(Limit storage limit, uint128 amount) internal returns (bool) {
         Limit memory _limit = limit;
         _refill(_limit);
         if (_limit.remaining < amount) {
@@ -110,14 +110,14 @@ library BucketLimiter {
 
     function _refill(Limit memory limit) internal view {
         // We allow for overflow here, as the delta is resilient against it.
-        uint64 now_ = uint64(block.timestamp);
-        uint64 delta;
+        uint128 now_ = uint128(block.timestamp);
+        uint128 delta;
         unchecked {
             delta = now_ - limit.lastRefill;
         }
         
-        uint64 tokens = delta * limit.refillRate;
-        uint64 newRemaining = limit.remaining + tokens;
+        uint128 tokens = delta * limit.refillRate;
+        uint128 newRemaining = limit.remaining + tokens;
         
         if (newRemaining > limit.capacity) {
             limit.remaining = limit.capacity;
@@ -134,7 +134,7 @@ library BucketLimiter {
      * @param limit The bucket to set the capacity of
      * @param capacity The new capacity
      */
-    function setCapacity(Limit storage limit, uint64 capacity) internal {
+    function setCapacity(Limit storage limit, uint128 capacity) internal {
         refill(limit);
         limit.capacity = capacity;
         if (limit.remaining > capacity) {
@@ -148,7 +148,7 @@ library BucketLimiter {
      * @param limit The bucket to set the refill rate of
      * @param refillRate The new refill rate
      */
-    function setRefillRate(Limit storage limit, uint64 refillRate) internal {
+    function setRefillRate(Limit storage limit, uint128 refillRate) internal {
         refill(limit);
         limit.refillRate = refillRate;
     }
@@ -160,7 +160,7 @@ library BucketLimiter {
      * @param limit The bucket to set the remaining capacity of
      * @param remaining The new remaining capacity
      */
-    function setRemaining(Limit storage limit, uint64 remaining) internal {
+    function setRemaining(Limit storage limit, uint128 remaining) internal {
         refill(limit);
         limit.remaining = remaining;
     }

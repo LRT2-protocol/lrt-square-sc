@@ -44,6 +44,13 @@ contract LrtSquare is
         uint64 positionWeightLimit;
     }
 
+    struct RateLimit {
+        BucketLimiter.Limit limit;
+        uint64 timePeriod;
+        uint64 renewTimestamp;
+        uint128 percentageLimit;
+    }
+
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     mapping(address => TokenInfo) public tokenInfos; 
@@ -54,7 +61,7 @@ contract LrtSquare is
     // address of the price provider
     address public priceProvider;
     // rate limit on deposit amount
-    BucketLimiter.Limit private rateLimit; 
+    RateLimit private rateLimit; 
     // address of the rebalancer
     address public rebalancer; 
     // tokens that are whitelisted as swap output tokens can only be the output of rebalancing
@@ -92,8 +99,9 @@ contract LrtSquare is
         address indexed withdrawer,
         uint256 amount
     );
-    event RefillRateUpdated(uint64 oldRate, uint64 newRate);
-    event RateLimitCapacityUpdated(uint64 oldCapacity, uint64 newCapacity);
+    event RefillRateUpdated(uint128 oldRate, uint128 newRate);
+    event PercentageRateLimitUpdated(uint128 oldPercentage, uint128 newPercentage);
+    event RateLimitTimePeriodUpdated(uint64 oldTimePeriod, uint64 newTimePeriod);
     event TokenMaxPositionWeightLimitUpdated(uint64 oldLimit, uint64 newLimit);
     event RebalancerSet(address oldRebalancer, address newRebalancer);
     event MaxSlippageForRebalanceSet(uint256 oldMaxSlippage, uint256 newMaxSlippage);
@@ -138,7 +146,8 @@ contract LrtSquare is
         address __governor,
         address __pauser,
         address __rebalancer,
-        address __swapper
+        address __swapper,
+        uint128 __percentageLimit
     ) public initializer {
         __ERC20_init(__name, __symbol);
         __ERC20Permit_init(__name);
@@ -150,11 +159,16 @@ contract LrtSquare is
         rebalancer = __rebalancer;
         swapper = __swapper;
 
-        // 1_000_000_000 = 100% for limiter
-        // Limit = 3_000_000_000 -> 300% of total suppply, refill rate -> 1_000_000 -> 0.1%, so will be refilled in 3000 sec (50 mins)
-        rateLimit = BucketLimiter.create(3_000_000_000, 1_000_000);
-        emit RateLimitCapacityUpdated(0, 3_000_000_000);
-        emit RefillRateUpdated(0, 1_000_000);
+        // Initially allows 1000 ether in an hour with refill rate of 0.01 ether per seconds -> Max 1 hour -> 1036 shares
+        // Updates every 1 hour -> new limit becomes percentageLimit * totalSupply
+        rateLimit = RateLimit({
+            limit: BucketLimiter.create(1000 ether, 0.01 ether),
+            timePeriod: 3600, 
+            renewTimestamp: uint64(block.timestamp + 3600),
+            percentageLimit: __percentageLimit
+        });
+        emit PercentageRateLimitUpdated(0, __percentageLimit);
+        emit RefillRateUpdated(0, 0.01 ether);
 
         // 0.5%
         maxSlippageForRebalancing = 0.995 ether;
@@ -164,8 +178,10 @@ contract LrtSquare is
         _mint(to, shareToMint);
     }
 
-    function getRateLimit() external view returns (BucketLimiter.Limit memory) {
-        return rateLimit.getCurrent();
+    function getRateLimit() external view returns (RateLimit memory) {
+        RateLimit memory _rateLimit = rateLimit;
+        _rateLimit.limit.getCurrent();
+        return _rateLimit;
     } 
 
     function whitelistRebalacingOutputToken(address _token, bool _shouldWhitelist) external onlyGovernor {
@@ -285,17 +301,31 @@ contract LrtSquare is
         priceProvider = _priceProvider;
     }
 
+    function setRateLimitConfig(uint128 __percentageLimit, uint64 __timePeriod, uint128 __refillRate) external onlyGovernor {
+        uint256 _totalSupply = totalSupply();
+        uint128 capactity = uint128(_totalSupply.mulDiv(__percentageLimit, HUNDRED_PERCENT_LIMIT));
+        rateLimit = RateLimit({
+            limit: BucketLimiter.create(capactity, __refillRate),
+            timePeriod: __timePeriod, 
+            renewTimestamp: uint64(block.timestamp + __timePeriod),
+            percentageLimit: __percentageLimit
+        });
+    }
 
-    function setRefillRatePerSecond(uint64 refillRate) external onlyGovernor {
-        BucketLimiter.Limit memory limit = rateLimit.getCurrent();
-        if (refillRate > limit.capacity) revert RateLimitRefillRateCannotBeGreaterThanCapacity();
-        emit RefillRateUpdated(limit.refillRate, refillRate);
-        rateLimit.refillRate = refillRate;
+    function setRateLimitTimePeriod(uint64 __timePeriod) external onlyGovernor {
+        if (__timePeriod == 0) revert InvalidValue();
+        emit RateLimitTimePeriodUpdated(rateLimit.timePeriod, __timePeriod);
+        rateLimit.timePeriod = __timePeriod;
+    }
+
+    function setRefillRatePerSecond(uint64 __refillRate) external onlyGovernor {
+        emit RefillRateUpdated(rateLimit.limit.refillRate, __refillRate);
+        rateLimit.limit.refillRate = __refillRate;
     }
     
-    function setRateLimitCapacity(uint64 capacity) external onlyGovernor {
-        emit RateLimitCapacityUpdated(rateLimit.capacity, capacity);
-        rateLimit.capacity = capacity;
+    function setPercentageRateLimit(uint128 __percentageLimit) external onlyGovernor {
+        emit PercentageRateLimitUpdated(rateLimit.percentageLimit, __percentageLimit);
+        rateLimit.percentageLimit = __percentageLimit;
     }
 
     /// @notice Deposit rewards to the contract and mint share tokens to the recipient.
@@ -306,7 +336,7 @@ contract LrtSquare is
         address[] memory _tokens,
         uint256[] memory _amounts,
         address _receiver
-    ) external whenNotPaused onlyDepositors {
+    ) external whenNotPaused onlyDepositors updateRateLimit {
         if (_tokens.length != _amounts.length) revert ArrayLengthMismatch();
         if (_receiver == address(0)) revert InvalidRecipient();
 
@@ -315,14 +345,12 @@ contract LrtSquare is
             1 * 10 ** decimals()
         );
 
-        uint256 totalSupplyBeforeDeposit = totalSupply();
-        uint256 shareToMint = previewDeposit(_tokens, _amounts);
+        uint256 shareToMint = previewDeposit(_tokens, _amounts);        
+        // if initial deposit, set renew timestamp to new timestamp
+        if (initialDeposit) rateLimit.renewTimestamp = uint64(block.timestamp + rateLimit.timePeriod);
         // check rate limit
-        if (totalSupplyBeforeDeposit !=0) {
-            uint64 amountForLimit = SafeCast.toUint64((shareToMint * HUNDRED_PERCENT_LIMIT) / totalSupplyBeforeDeposit);
-            if(!rateLimit.consume(amountForLimit)) revert RateLimitExceeded();
-        } 
-
+        if(!rateLimit.limit.consume(uint128(shareToMint))) revert RateLimitExceeded();
+        
         _deposit(_tokens, _amounts, shareToMint, _receiver);
 
         _verifyPositionLimits();
@@ -598,7 +626,7 @@ contract LrtSquare is
     ) public view virtual returns (uint256) {
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) return valueInEth;
-        
+
         return valueInEth.mulDiv(_totalSupply, getVaultTokenValuesInEth(_totalSupply), rounding);
     }
 
@@ -661,5 +689,22 @@ contract LrtSquare is
 
     function _onlyRebalancer() internal view {
         if (rebalancer != msg.sender) revert OnlyRebalancer();
+    }
+
+    modifier updateRateLimit {
+        _updateRateLimit();
+        _;
+    }
+
+    function _updateRateLimit() internal {
+        uint256 _totalSupply = totalSupply();
+        if(_totalSupply == 0) return;
+        
+        // If total supply = 0, can't mint anything since new rate limit which is a percentage of total supply would be 0
+        if (block.timestamp > rateLimit.renewTimestamp) {
+            uint128 capactity = uint128(_totalSupply.mulDiv(rateLimit.percentageLimit, HUNDRED_PERCENT_LIMIT));
+            rateLimit.limit = BucketLimiter.create(capactity, rateLimit.limit.refillRate);
+            rateLimit.renewTimestamp = uint64(block.timestamp + rateLimit.timePeriod);
+        }
     }
 }
