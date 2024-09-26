@@ -320,7 +320,7 @@ contract LrtSquare is
 
     function setRefillRatePerSecond(uint64 __refillRate) external onlyGovernor {
         emit RefillRateUpdated(rateLimit.limit.refillRate, __refillRate);
-        rateLimit.limit.refillRate = __refillRate;
+        rateLimit.limit.setRefillRate(__refillRate);
     }
     
     function setPercentageRateLimit(uint128 __percentageLimit) external onlyGovernor {
