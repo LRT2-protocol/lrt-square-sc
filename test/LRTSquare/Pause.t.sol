@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.25;
 
-import {LRTSquareTestSetup, LrtSquare, SafeERC20, IERC20} from "./LRTSquareSetup.t.sol";
+import {LRTSquareTestSetup, LRTSquare, SafeERC20, IERC20} from "./LRTSquareSetup.t.sol";
 
 error EnforcedPause();
 error ExpectedPause();
@@ -45,7 +45,7 @@ contract LRTSquarePauseTest is LRTSquareTestSetup {
         deal(alice, depositAmt);
         vm.prank(alice);
         vm.expectEmit(true, true, true, true);
-        emit LrtSquare.CommunityPause(alice);
+        emit LRTSquare.CommunityPause(alice);
         lrtSquare.communityPause{value: depositAmt}();
 
         assertEq(lrtSquare.paused(), true);
@@ -92,7 +92,7 @@ contract LRTSquarePauseTest is LRTSquareTestSetup {
 
     function test_CannotCommunityPauseIfDepositAmountNotSet() public {
         vm.prank(alice);
-        vm.expectRevert(LrtSquare.CommunityPauseDepositNotSet.selector);
+        vm.expectRevert(LRTSquare.CommunityPauseDepositNotSet.selector);
         lrtSquare.communityPause();
     }
 
@@ -104,15 +104,13 @@ contract LRTSquarePauseTest is LRTSquareTestSetup {
         deal(alice, depositAmt);
 
         vm.prank(alice);
-        vm.expectRevert(LrtSquare.IncorrectAmountOfEtherSent.selector);
+        vm.expectRevert(LRTSquare.IncorrectAmountOfEtherSent.selector);
         lrtSquare.communityPause{value: depositAmt - 1}();
     }
 
     function test_OnlyPauserCanPause() public {
         vm.startPrank(alice);
-        vm.expectRevert(
-            _buildAccessControlRevertData(alice, lrtSquare.PAUSER_ROLE())
-        );
+        vm.expectRevert(LRTSquare.OnlyPauser.selector);
         lrtSquare.pause();
         vm.stopPrank();
     }
@@ -122,9 +120,7 @@ contract LRTSquarePauseTest is LRTSquareTestSetup {
         lrtSquare.pause();
 
         vm.startPrank(alice);
-        vm.expectRevert(
-            _buildAccessControlRevertData(alice, lrtSquare.PAUSER_ROLE())
-        );
+        vm.expectRevert(LRTSquare.OnlyPauser.selector);
         lrtSquare.unpause();
         vm.stopPrank();
     }

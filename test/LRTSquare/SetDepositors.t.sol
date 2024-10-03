@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquareTestSetup, LrtSquare} from "./LRTSquareSetup.t.sol";
+import {LRTSquareTestSetup, LRTSquare} from "./LRTSquareSetup.t.sol";
 
 contract LRTSquareSetDepositorsTest is LRTSquareTestSetup {
     function test_SetDepositorsWithGovernance() public {
@@ -27,7 +27,7 @@ contract LRTSquareSetDepositorsTest is LRTSquareTestSetup {
         _setDepositors(
             depositors,
             isDepositor,
-            abi.encodeWithSelector(LrtSquare.InvalidValue.selector)
+            abi.encodeWithSelector(LRTSquare.InvalidValue.selector)
         );
     }
 
@@ -42,7 +42,7 @@ contract LRTSquareSetDepositorsTest is LRTSquareTestSetup {
         _setDepositors(
             depositors,
             isDepositor,
-            abi.encodeWithSelector(LrtSquare.ArrayLengthMismatch.selector)
+            abi.encodeWithSelector(LRTSquare.ArrayLengthMismatch.selector)
         );
     }
 }

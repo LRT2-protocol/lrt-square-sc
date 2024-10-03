@@ -1,0 +1,14 @@
+{
+    "1": {
+        "owner": "0x7D829d50aAF400B8B29B3b311F4aD70aD819DC6E",
+        "rebalancer": "0x7D829d50aAF400B8B29B3b311F4aD70aD819DC6E",
+        "pauser": "0x7D829d50aAF400B8B29B3b311F4aD70aD819DC6E",
+        "swapRouter1InchV6": "0x111111125421cA6dc452d289314280a0f8842A65",
+        "ethfi": "0xfe0c30065b384f05761f15d0cc899d4f9f9cc0eb",
+        "eigen": "0xec53bF9167f50cDEB3Ae105f56099aaaB9061F83",
+        "ethfiChainlinkOracle": "0xD10aBbC76679a20055E167BB80A24ac851b37056",
+        "eigenChainlinkOracle": "0xf2917e602C2dCa458937fad715bb1E465305A4A1",
+        "ethUsdChainlinkOracle": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+    }
+}
+

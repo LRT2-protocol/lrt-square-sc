@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquareTestSetup, LrtSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
+import {LRTSquareTestSetup, LRTSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
 
 contract LRTSquareBasicsTest is LRTSquareTestSetup {
     using SafeERC20 for IERC20;
@@ -26,7 +26,7 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         assertEq(lrtSquare.totalSupply(), 0);
         assertEq(lrtSquare.totalAssetsValueInEth(), 0);
 
-        vm.expectRevert(LrtSquare.TotalSupplyZero.selector);
+        vm.expectRevert(LRTSquare.TotalSupplyZero.selector);
         lrtSquare.assetsForVaultShares(1);
 
         address[] memory _tokens = new address[](3);
@@ -76,7 +76,7 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         uint256[] memory _amounts = new uint256[](1);
         _amounts[0] = 1 * 10 ** tokenDecimals[0];
 
-        vm.expectRevert(LrtSquare.ArrayLengthMismatch.selector);
+        vm.expectRevert(LRTSquare.ArrayLengthMismatch.selector);
         lrtSquare.getTokenValuesInEth(_tokens, _amounts);
     }
 
@@ -87,7 +87,7 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         uint256[] memory _amounts = new uint256[](1);
         _amounts[0] = 1 ether;
 
-        vm.expectRevert(LrtSquare.TokenNotRegistered.selector);
+        vm.expectRevert(LRTSquare.TokenNotRegistered.selector);
         lrtSquare.getTokenValuesInEth(_tokens, _amounts);
     }
 

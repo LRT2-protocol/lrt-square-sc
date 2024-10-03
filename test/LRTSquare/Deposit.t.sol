@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquareTestSetup, LrtSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
+import {LRTSquareTestSetup, LRTSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
 
 contract LRTSquareDepositTest is LRTSquareTestSetup {
     using SafeERC20 for IERC20;
@@ -55,7 +55,7 @@ contract LRTSquareDepositTest is LRTSquareTestSetup {
             }
         }
         vm.expectEmit(true, true, true, true);
-        emit LrtSquare.Deposit(
+        emit LRTSquare.Deposit(
             alice,
             alice,
             expectedSharesAfterDeposit,
@@ -113,7 +113,7 @@ contract LRTSquareDepositTest is LRTSquareTestSetup {
         _amounts[2] = 25 * 10 ** tokenDecimals[2];
 
         vm.prank(owner);
-        vm.expectRevert(LrtSquare.OnlyDepositors.selector);
+        vm.expectRevert(LRTSquare.OnlyDepositors.selector);
         lrtSquare.deposit(_tokens, _amounts, owner);
     }
 
@@ -128,7 +128,7 @@ contract LRTSquareDepositTest is LRTSquareTestSetup {
         _amounts[1] = 50 * 10 ** tokenDecimals[1];
 
         vm.prank(alice);
-        vm.expectRevert(LrtSquare.ArrayLengthMismatch.selector);
+        vm.expectRevert(LRTSquare.ArrayLengthMismatch.selector);
         lrtSquare.deposit(_tokens, _amounts, alice);
     }
 
@@ -142,7 +142,7 @@ contract LRTSquareDepositTest is LRTSquareTestSetup {
         _amounts[1] = 50 * 10 ** tokenDecimals[1];
 
         vm.prank(alice);
-        vm.expectRevert(LrtSquare.InvalidRecipient.selector);
+        vm.expectRevert(LRTSquare.InvalidRecipient.selector);
         lrtSquare.deposit(_tokens, _amounts, address(0));
     }
 
@@ -156,7 +156,7 @@ contract LRTSquareDepositTest is LRTSquareTestSetup {
         _amounts[1] = 1;
 
         vm.prank(alice);
-        vm.expectRevert(LrtSquare.TokenNotRegistered.selector);
+        vm.expectRevert(LRTSquare.TokenNotRegistered.selector);
         lrtSquare.deposit(_tokens, _amounts, alice);
     }
 
@@ -172,7 +172,7 @@ contract LRTSquareDepositTest is LRTSquareTestSetup {
         _amounts[1] = 10 * 10 ** tokenDecimals[1];
 
         vm.prank(alice);
-        vm.expectRevert(LrtSquare.TokenNotWhitelisted.selector);
+        vm.expectRevert(LRTSquare.TokenNotWhitelisted.selector);
         lrtSquare.deposit(_tokens, _amounts, alice);
     }
 
@@ -186,7 +186,7 @@ contract LRTSquareDepositTest is LRTSquareTestSetup {
         _amounts[0] = 10 * 10 ** tokenDecimals[0];
 
         vm.prank(alice);
-        vm.expectRevert(LrtSquare.PriceProviderFailed.selector);
+        vm.expectRevert(LRTSquare.PriceProviderFailed.selector);
         lrtSquare.deposit(_tokens, _amounts, alice);
     }
 }

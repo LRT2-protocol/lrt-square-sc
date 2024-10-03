@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquareTestSetup, LrtSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
+import {LRTSquareTestSetup, LRTSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
 
 contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
     uint256 initialDepositToken0 = 100 ether;
@@ -68,7 +68,7 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
         _updateTokenPositionWeightLimit(
             address(0), 
             1, 
-            abi.encodeWithSelector(LrtSquare.InvalidValue.selector)
+            abi.encodeWithSelector(LRTSquare.InvalidValue.selector)
         );
     }
 
@@ -76,7 +76,7 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
         _updateTokenPositionWeightLimit(
             address(1), 
             1, 
-            abi.encodeWithSelector(LrtSquare.TokenNotRegistered.selector)
+            abi.encodeWithSelector(LRTSquare.TokenNotRegistered.selector)
         );
     }
 
@@ -84,7 +84,7 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
         _updateTokenPositionWeightLimit(
             address(tokens[0]), 
             lrtSquare.HUNDRED_PERCENT_LIMIT() + 1, 
-            abi.encodeWithSelector(LrtSquare.WeightLimitCannotBeGreaterThanHundred.selector)
+            abi.encodeWithSelector(LRTSquare.WeightLimitCannotBeGreaterThanHundred.selector)
         );
     }
 
@@ -143,7 +143,7 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
         
         vm.startPrank(owner);
         tokens[1].approve(address(lrtSquare), initialDepositToken0);
-        vm.expectRevert(LrtSquare.TokenWeightLimitBreached.selector);
+        vm.expectRevert(LRTSquare.TokenWeightLimitBreached.selector);
         lrtSquare.deposit(assetsToSupply, amountsToSupply, merkleDistributor);
         vm.stopPrank(); 
     }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquareTestSetup, LrtSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
+import {LRTSquareTestSetup, LRTSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
 
 contract LRTSquareRedeemTest is LRTSquareTestSetup {
     using SafeERC20 for IERC20;
@@ -56,7 +56,7 @@ contract LRTSquareRedeemTest is LRTSquareTestSetup {
         }
 
         vm.expectEmit(true, true, true, true);
-        emit LrtSquare.Deposit(alice, alice, sharesAlloted, _tokens, _amounts);
+        emit LRTSquare.Deposit(alice, alice, sharesAlloted, _tokens, _amounts);
         lrtSquare.deposit(_tokens, _amounts, alice);
         vm.stopPrank();
     }
@@ -69,7 +69,7 @@ contract LRTSquareRedeemTest is LRTSquareTestSetup {
 
         vm.prank(alice);
         vm.expectEmit(true, true, true, false);
-        emit LrtSquare.Redeem(alice, sharesAlloted, _tokens, _amounts);
+        emit LRTSquare.Redeem(alice, sharesAlloted, _tokens, _amounts);
         lrtSquare.redeem(sharesAlloted);
 
         uint256 aliceSharesAfter = lrtSquare.balanceOf(alice);
@@ -98,7 +98,7 @@ contract LRTSquareRedeemTest is LRTSquareTestSetup {
 
     function test_CannotRedeemIfInsufficientShares() public {
         vm.prank(alice);
-        vm.expectRevert(LrtSquare.InsufficientShares.selector);
+        vm.expectRevert(LRTSquare.InsufficientShares.selector);
         lrtSquare.redeem(sharesAlloted + 1);
     }
 }

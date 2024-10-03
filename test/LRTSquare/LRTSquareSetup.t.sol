@@ -4,7 +4,7 @@ pragma solidity ^0.8.25;
 import {Utils} from "../Utils.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
-import {LrtSquare, Governable} from "../../src/LrtSquare.sol";
+import {LRTSquare, Governable} from "../../src/LRTSquare.sol";
 import {UUPSProxy} from "src/UUPSProxy.sol";
 import {MockPriceProvider} from "../../src/mocks/MockPriceProvider.sol";
 import {GovernanceToken} from "../../src/governance/GovernanceToken.sol";
@@ -27,9 +27,8 @@ interface IPriceProvider {
 contract LRTSquareTestSetup is Utils {
     using SafeERC20 for IERC20;
 
-    uint48 initialDelayForAccessControl = 100;
     address pauser = makeAddr("pauser");
-    LrtSquare public lrtSquare;
+    LRTSquare public lrtSquare;
 
     MockERC20[] public tokens;
     IPriceProvider public priceProvider;
@@ -67,13 +66,12 @@ contract LRTSquareTestSetup is Utils {
         timelock.grantRole(timelock.EXECUTOR_ROLE(), address(0));
         timelock.renounceRole(timelock.DEFAULT_ADMIN_ROLE(), admin);
 
-        lrtSquare = LrtSquare(
-            address(new UUPSProxy(address(new LrtSquare()), ""))
+        lrtSquare = LRTSquare(
+            address(new UUPSProxy(address(new LRTSquare()), ""))
         );
         lrtSquare.initialize(
             "LrtSquare",
             "LRT",
-            initialDelayForAccessControl,
             address(timelock),
             pauser,
             rebalancer, 
@@ -123,7 +121,7 @@ contract LRTSquareTestSetup is Utils {
         );
 
         bytes memory data = abi.encodeWithSelector(
-            LrtSquare.registerToken.selector,
+            LRTSquare.registerToken.selector,
             token,
             tokenMaxPercentage
         );
@@ -147,7 +145,7 @@ contract LRTSquareTestSetup is Utils {
             )
         );
         bytes memory data = abi.encodeWithSelector(
-            LrtSquare.updateWhitelist.selector,
+            LRTSquare.updateWhitelist.selector,
             token,
             whitelist
         );
@@ -168,7 +166,7 @@ contract LRTSquareTestSetup is Utils {
             )
         );
         bytes memory data = abi.encodeWithSelector(
-            LrtSquare.updatePriceProvider.selector,
+            LRTSquare.updatePriceProvider.selector,
             _priceProvider
         );
 
@@ -183,7 +181,7 @@ contract LRTSquareTestSetup is Utils {
         string memory description = "Proposal: Set depositors";
 
         bytes memory data = abi.encodeWithSelector(
-            LrtSquare.setDepositors.selector,
+            LRTSquare.setDepositors.selector,
             depositors,
             isDepositor
         );
@@ -204,7 +202,7 @@ contract LRTSquareTestSetup is Utils {
         );
 
         bytes memory data = abi.encodeWithSelector(
-            LrtSquare.updateTokenPositionWeightLimit.selector,
+            LRTSquare.updateTokenPositionWeightLimit.selector,
             token,
             maxPercentage
         );
@@ -219,7 +217,7 @@ contract LRTSquareTestSetup is Utils {
         string memory description = "Proposal: Set rate limit refill rate";
 
         bytes memory data = abi.encodeWithSelector(
-            LrtSquare.setRefillRatePerSecond.selector,
+            LRTSquare.setRefillRatePerSecond.selector,
             refillRate
         );
 
@@ -233,7 +231,7 @@ contract LRTSquareTestSetup is Utils {
         string memory description = "Proposal: Set rate limit time period";
 
         bytes memory data = abi.encodeWithSelector(
-            LrtSquare.setRateLimitTimePeriod.selector,
+            LRTSquare.setRateLimitTimePeriod.selector,
             timePeriod
         );
 
@@ -247,7 +245,7 @@ contract LRTSquareTestSetup is Utils {
         string memory description = "Proposal: Set rate limit percentage";
 
         bytes memory data = abi.encodeWithSelector(
-            LrtSquare.setPercentageRateLimit.selector,
+            LRTSquare.setPercentageRateLimit.selector,
             percentageLimit
         );
 
@@ -263,7 +261,7 @@ contract LRTSquareTestSetup is Utils {
         string memory description = "Proposal: Set rate limit config";
 
         bytes memory data = abi.encodeWithSelector(
-            LrtSquare.setRateLimitConfig.selector,
+            LRTSquare.setRateLimitConfig.selector,
             __percentageLimit,
             __timePeriod, 
             __refillRate
@@ -367,17 +365,5 @@ contract LRTSquareTestSetup is Utils {
         );
 
         return (valueInEth * (_totalSupply + 1)) / (_vaultTokenValuesInEth + 1);
-    }
-
-    function _buildAccessControlRevertData(
-        address account,
-        bytes32 role
-    ) internal pure returns (bytes memory) {
-        return
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                account,
-                role
-            );
     }
 }

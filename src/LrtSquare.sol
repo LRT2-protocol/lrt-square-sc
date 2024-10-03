@@ -9,7 +9,6 @@ import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/contract
 import {IPriceProvider} from "src/interfaces/IPriceProvider.sol";
 import {Governable} from "./governance/Governable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
-import {AccessControlDefaultAdminRulesUpgradeable} from "@openzeppelin-upgradeable/contracts/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import {BucketLimiter} from "./libraries/BucketLimiter.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ISwapper} from "./interfaces/ISwapper.sol";
@@ -26,12 +25,11 @@ import {ISwapper} from "./interfaces/ISwapper.sol";
     benefiting users with smaller stakes who might prefer managing/trading their share tokens directly, 
     while larger holders have the option to redeem and potentially arbitrage.
 */
-contract LrtSquare is
+contract LRTSquare is
     Initializable,
     Governable,
     ERC20PermitUpgradeable,
     PausableUpgradeable,
-    AccessControlDefaultAdminRulesUpgradeable,
     UUPSUpgradeable
 {
     using BucketLimiter for BucketLimiter.Limit;
@@ -51,8 +49,6 @@ contract LrtSquare is
         uint128 percentageLimit;
     }
 
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-
     mapping(address => TokenInfo) public tokenInfos; 
     // only whitelisted depositors can deposit tokens into the vault
     mapping(address => bool) public depositor; 
@@ -70,6 +66,8 @@ contract LrtSquare is
     uint256 public maxSlippageForRebalancing; 
     // Swapper is a helper contract that helps us swap funds in the vault and rebalance 
     address public swapper; 
+    // Swapper is a helper contract that helps us swap funds in the vault and rebalance 
+    address public pauser;
 
     uint64 public constant HUNDRED_PERCENT_LIMIT = 1_000_000_000;
 
@@ -130,6 +128,7 @@ contract LrtSquare is
     error WeightLimitCannotBeGreaterThanHundred();
     error TokenWeightLimitBreached();
     error OnlyRebalancer();
+    error OnlyPauser();
     error NotAValidRebalanceOutputToken();
     error InsufficientTokensReceivedFromSwapper();
     error ApplicableSlippageGreaterThanMaxLimit();
@@ -142,7 +141,6 @@ contract LrtSquare is
     function initialize(
         string memory __name,
         string memory __symbol,
-        uint48 __accessControlDelay,
         address __governor,
         address __pauser,
         address __rebalancer,
@@ -152,12 +150,11 @@ contract LrtSquare is
         __ERC20_init(__name, __symbol);
         __ERC20Permit_init(__name);
         __UUPSUpgradeable_init();
-        __AccessControlDefaultAdminRules_init(__accessControlDelay, __governor);
-        _grantRole(PAUSER_ROLE, __pauser);
 
         _setGovernor(__governor);
         rebalancer = __rebalancer;
         swapper = __swapper;
+        pauser = __pauser;
 
         // Initially allows 1000 ether in an hour with refill rate of 0.01 ether per seconds -> Max 1 hour -> 1036 shares
         // Updates every 1 hour -> new limit becomes percentageLimit * totalSupply
@@ -173,11 +170,7 @@ contract LrtSquare is
         // 0.5%
         maxSlippageForRebalancing = 0.995 ether;
     }
-
-    function mint(address to, uint256 shareToMint) external onlyGovernor {
-        _mint(to, shareToMint);
-    }
-
+    
     function getRateLimit() external view returns (RateLimit memory) {
         RateLimit memory _rateLimit = rateLimit;
         _rateLimit.limit.getCurrent();
@@ -259,10 +252,7 @@ contract LrtSquare is
         maxSlippageForRebalancing = maxSlippage;
     }
     
-    function updateWhitelist(
-        address _token,
-        bool _whitelist
-    ) external onlyGovernor {
+    function updateWhitelist(address _token, bool _whitelist) external onlyGovernor {
         if (_token == address(0)) revert InvalidValue();
         if (!isTokenRegistered(_token)) revert TokenNotRegistered();
         tokenInfos[_token].whitelisted = _whitelist;
@@ -277,10 +267,7 @@ contract LrtSquare is
         tokenInfos[_token].positionWeightLimit = _TokenPositionWeightLimit;
     }
 
-    function setDepositors(
-        address[] memory depositors,
-        bool[] memory isDepositor
-    ) external onlyGovernor {
+    function setDepositors(address[] memory depositors, bool[] memory isDepositor) external onlyGovernor {
         uint256 len = depositors.length;
         if (len != isDepositor.length) revert ArrayLengthMismatch();
         for (uint256 i = 0; i < len; ) {
@@ -536,11 +523,11 @@ contract LrtSquare is
         emit CommunityPause(msg.sender);
     }
 
-    function pause() external onlyRole(PAUSER_ROLE) whenNotPaused {
+    function pause() external onlyPauser whenNotPaused {
         _pause();
     }
 
-    function unpause() external onlyRole(PAUSER_ROLE) whenPaused {
+    function unpause() external onlyPauser whenPaused {
         uint256 amount = communityPauseDepositedAmt;
         if (amount != 0) {
             communityPauseDepositedAmt = 0;
@@ -551,10 +538,7 @@ contract LrtSquare is
         _unpause();
     }
 
-    function withdrawCommunityDepositedPauseAmount()
-        public
-        onlyRole(PAUSER_ROLE)
-    {
+    function withdrawCommunityDepositedPauseAmount() public onlyPauser {
         uint256 amount = communityPauseDepositedAmt;
 
         if (amount == 0) revert NoCommunityPauseDepositAvailable();
@@ -564,12 +548,11 @@ contract LrtSquare is
         emit CommunityPauseAmountWithdrawal(msg.sender, amount);
     }
 
-    function setCommunityPauseDepositAmount(
-        uint256 amount
-    ) external onlyGovernor {
+    function setCommunityPauseDepositAmount(uint256 amount) external onlyGovernor {
         emit CommunityPauseDepositSet(depositForCommunityPause, amount);
         depositForCommunityPause = amount;
     }
+
     function positionWeightLimit() public view returns (address[] memory, uint64[] memory) {
         uint256 len = tokens.length;
         uint64[] memory positionWeightLimits = new uint64[](len);
@@ -669,9 +652,7 @@ contract LrtSquare is
         if (!success) revert EtherTransferFailed();
     }
 
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyGovernor {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyGovernor {}
 
     modifier onlyDepositors() {
         _onlyDepositors();
@@ -689,6 +670,15 @@ contract LrtSquare is
 
     function _onlyRebalancer() internal view {
         if (rebalancer != msg.sender) revert OnlyRebalancer();
+    }
+
+    modifier onlyPauser() {
+        _onlyPauser();
+        _;
+    }
+
+    function _onlyPauser() internal view {
+        if (pauser != msg.sender) revert OnlyPauser();
     }
 
     modifier updateRateLimit {
