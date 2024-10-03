@@ -50,7 +50,8 @@ contract DeployLRTSquare is Utils {
 
         swapper = new Swapper1InchV6(swapRouter1InchV6, tokens);
 
-        lrtSquare = LRTSquare(address(new UUPSProxy(address(new LRTSquare()), "")));
+        address lrtSquareImpl = address(new LRTSquare());
+        lrtSquare = LRTSquare(address(new UUPSProxy(lrtSquareImpl, "")));
         lrtSquare.initialize(
             "LrtSquare",
             "LRT2",
@@ -120,8 +121,8 @@ contract DeployLRTSquare is Utils {
 
         string memory deployedAddresses = "addresses";
 
-        vm.serializeAddress(deployedAddresses, "lrtSquare", address(lrtSquare));
-
+        vm.serializeAddress(deployedAddresses, "lrtSquareProxt", address(lrtSquare));
+        vm.serializeAddress(deployedAddresses, "lrtSquareImpl", lrtSquareImpl);
         vm.serializeAddress(deployedAddresses, "priceProvider", address(priceProvider));
         vm.serializeAddress(
             deployedAddresses,
@@ -139,7 +140,6 @@ contract DeployLRTSquare is Utils {
             "pauser",
             address(pauser)
         );
-        
 
         string memory addressOutput = vm.serializeAddress(
             deployedAddresses,
