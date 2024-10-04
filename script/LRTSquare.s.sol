@@ -31,6 +31,7 @@ contract DeployLRTSquare is Utils {
     uint64[] tokenPositionWeightLimits;
 
     uint128 percentageRateLimit = 5_000_000_000; // 500%
+    uint256 communityPauseDepositAmt = 10 ether;
 
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -48,27 +49,17 @@ contract DeployLRTSquare is Utils {
         eigen = config.eigen;
         swapRouter1InchV6 = config.swapRouter1InchV6;
 
-        swapper = new Swapper1InchV6(swapRouter1InchV6, tokens);
-
-        address lrtSquareImpl = address(new LRTSquare());
-        lrtSquare = LRTSquare(address(new UUPSProxy(lrtSquareImpl, "")));
-        lrtSquare.initialize(
-            "LrtSquare",
-            "LRT2",
-            deployer,
-            pauser,
-            rebalancer, 
-            address(swapper),
-            percentageRateLimit
-        );
+        swapper = new Swapper1InchV6(swapRouter1InchV6);
 
         tokens.push(ethfi); 
         tokens.push(eigen);
+        tokens.push(WETH);
         tokens.push(ETH);
 
-        tokenPositionWeightLimits.push(lrtSquare.HUNDRED_PERCENT_LIMIT());
-        tokenPositionWeightLimits.push(lrtSquare.HUNDRED_PERCENT_LIMIT());        
-        tokenPositionWeightLimits.push(lrtSquare.HUNDRED_PERCENT_LIMIT());        
+        tokenPositionWeightLimits.push(HUNDRED_PERCENT_LIMIT);
+        tokenPositionWeightLimits.push(HUNDRED_PERCENT_LIMIT);        
+        tokenPositionWeightLimits.push(HUNDRED_PERCENT_LIMIT);        
+        tokenPositionWeightLimits.push(HUNDRED_PERCENT_LIMIT);        
         
         PriceProvider.Config[] memory priceProviderConfig = new PriceProvider.Config[](tokens.length);
         
@@ -101,11 +92,48 @@ contract DeployLRTSquare is Utils {
             dataType: PriceProvider.ReturnType.Int256,
             isBaseTokenEth: false
         });
+       
+        priceProviderConfig[3] = PriceProvider.Config({
+            oracle: config.ethUsdChainlinkOracle,
+            priceFunctionCalldata: hex"",
+            isChainlinkType: true,
+            oraclePriceDecimals: IAggregatorV3(config.ethUsdChainlinkOracle).decimals(),
+            maxStaleness: 1 days,
+            dataType: PriceProvider.ReturnType.Int256,
+            isBaseTokenEth: false
+        });
 
-        priceProvider = new PriceProvider(deployer, tokens, priceProviderConfig);
+        address priceProviderImpl = address(new PriceProvider());
+        priceProvider = PriceProvider(
+            address(
+                new UUPSProxy(
+                    priceProviderImpl, 
+                    abi.encodeWithSelector(
+                        PriceProvider.initialize.selector,
+                        deployer,
+                        tokens,
+                        priceProviderConfig
+                    )
+                )
+            )
+        );
 
-        lrtSquare.updatePriceProvider(address(priceProvider));
+        address lrtSquareImpl = address(new LRTSquare());
+        lrtSquare = LRTSquare(address(new UUPSProxy(lrtSquareImpl, "")));
+        lrtSquare.initialize(
+            "LrtSquare",
+            "LRT2",
+            deployer,
+            pauser,
+            rebalancer, 
+            address(swapper),
+            address(priceProvider),
+            percentageRateLimit,
+            communityPauseDepositAmt
+        );
         
+        tokens.pop();
+        tokenPositionWeightLimits.pop();
         for (uint256 i = 0; i < tokens.length; ) {
             lrtSquare.registerToken(tokens[i], tokenPositionWeightLimits[i]);
             unchecked {
@@ -113,7 +141,7 @@ contract DeployLRTSquare is Utils {
             }
         }
 
-        lrtSquare.whitelistRebalacingOutputToken(ETH, true);
+        lrtSquare.whitelistRebalacingOutputToken(WETH, true);
 
         // lrtSquare.transferGovernance(owner);
 
@@ -126,8 +154,13 @@ contract DeployLRTSquare is Utils {
         vm.serializeAddress(deployedAddresses, "priceProvider", address(priceProvider));
         vm.serializeAddress(
             deployedAddresses,
-            "priceProvider",
+            "priceProviderProxy",
             address(priceProvider)
+        );
+        vm.serializeAddress(
+            deployedAddresses,
+            "priceProviderImpl",
+            priceProviderImpl
         );
         vm.serializeAddress(deployedAddresses, "owner", address(owner));
         vm.serializeAddress(

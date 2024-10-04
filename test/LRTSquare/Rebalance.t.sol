@@ -7,6 +7,7 @@ import {PriceProvider} from "../../src/PriceProvider.sol";
 import {IAggregatorV3} from "../../src/interfaces/IAggregatorV3.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Governable} from "../../src/governance/Governable.sol";
+import {UUPSProxy} from "../../src/UUPSProxy.sol";
 
 interface IWeETH {
     function getEETHByWeETH(uint256 _weETHAmoun) external view returns (uint256);
@@ -41,7 +42,7 @@ contract LRTSquareRebalanceTest is LRTSquareTestSetup {
         assets[0] = address(weETH);
         assets[1] = address(btc);
 
-        swapper1Inch = new Swapper1InchV6(swapRouter1InchV6, assets);
+        swapper1Inch = new Swapper1InchV6(swapRouter1InchV6);
 
 
         vm.startPrank(address(timelock));
@@ -89,12 +90,21 @@ contract LRTSquareRebalanceTest is LRTSquareTestSetup {
         initialTokensConfig[1] = btcConfig;
         initialTokensConfig[2] = ethConfig;
 
-        oracle = IPriceProvider(address(new PriceProvider(
-            address(timelock),
-            initialTokens,
-            initialTokensConfig
-        )));
-
+        address priceProviderImpl = address(new PriceProvider());
+        oracle = IPriceProvider(
+            address(
+                new UUPSProxy(
+                    priceProviderImpl, 
+                    abi.encodeWithSelector(
+                        PriceProvider.initialize.selector,
+                        address(timelock),
+                        initialTokens,
+                        initialTokensConfig
+                    )
+                )
+            )
+        );
+        
         address[] memory depositors = new address[](1);
         depositors[0] = alice;
         bool[] memory isDepositor = new bool[](1);

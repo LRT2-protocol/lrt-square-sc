@@ -1,93 +1,9 @@
 import axios from "axios";
-import { ethers } from "ethers";
+import dotenv from "dotenv";
+dotenv.config();
 
 const ONEINCH_API_ENDPOINT = "https://api.1inch.dev/swap/v6.0";
-const ONEINCH_API_KEY = "v0IsPOhQWKrDo7t1IZlOFibcSN41dc2n";
-const SWAP_SELECTOR = "0x07ed2379"; // swap(address,(address,address,address,address,uint256,uint256,uint256),bytes)
-const UNOSWAP_TO_SELECTOR = "0xe2c95c82"; // unoswapTo(uint256,uint256,uint256,uint256,uint256)
-const UNOSWAP_TO_2_SELECTOR = "0xea76dddf"; // unoswapTo2(uint256,uint256,uint256,uint256,uint256,uint256)
-const ONE_INCH_ROUTER_V6 = "0x111111125421cA6dc452d289314280a0f8842A65";
-
-const ONE_INCH_V6_ABI = [
-  {
-    type: "function",
-    name: "swap",
-    inputs: [
-      {
-        name: "executor",
-        type: "address",
-        internalType: "contract IAggregationExecutor",
-      },
-      {
-        name: "desc",
-        type: "tuple",
-        internalType: "struct SwapDescription",
-        components: [
-          {
-            name: "srcToken",
-            type: "address",
-            internalType: "contract IERC20",
-          },
-          {
-            name: "dstToken",
-            type: "address",
-            internalType: "contract IERC20",
-          },
-          {
-            name: "srcReceiver",
-            type: "address",
-            internalType: "address payable",
-          },
-          {
-            name: "dstReceiver",
-            type: "address",
-            internalType: "address payable",
-          },
-          { name: "amount", type: "uint256", internalType: "uint256" },
-          { name: "minReturnAmount", type: "uint256", internalType: "uint256" },
-          { name: "flags", type: "uint256", internalType: "uint256" },
-        ],
-      },
-      { name: "data", type: "bytes", internalType: "bytes" },
-    ],
-    outputs: [
-      { name: "returnAmount", type: "uint256", internalType: "uint256" },
-      { name: "spentAmount", type: "uint256", internalType: "uint256" },
-    ],
-    stateMutability: "payable",
-  },
-  {
-    type: "function",
-    name: "unoswapTo",
-    inputs: [
-      { name: "to", type: "uint256", internalType: "uint256" },
-      { name: "token", type: "uint256", internalType: "uint256" },
-      { name: "amount", type: "uint256", internalType: "uint256" },
-      { name: "minReturn", type: "uint256", internalType: "uint256" },
-      { name: "dex", type: "uint256", internalType: "uint256" },
-    ],
-    outputs: [
-      { name: "returnAmount", type: "uint256", internalType: "uint256" },
-    ],
-    stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "unoswapTo2",
-    inputs: [
-      { name: "to", type: "uint256", internalType: "uint256" },
-      { name: "token", type: "uint256", internalType: "uint256" },
-      { name: "amount", type: "uint256", internalType: "uint256" },
-      { name: "minReturn", type: "uint256", internalType: "uint256" },
-      { name: "dex", type: "uint256", internalType: "uint256" },
-      { name: "dex2", type: "uint256", internalType: "uint256" },
-    ],
-    outputs: [
-      { name: "returnAmount", type: "uint256", internalType: "uint256" },
-    ],
-    stateMutability: "nonpayable",
-  },
-];
+const ONEINCH_API_KEY = process.env.ONEINCH_API_KEY;
 
 export const getData = async () => {
   const args = process.argv;
@@ -98,6 +14,8 @@ export const getData = async () => {
   const toAsset = args[6];
   const fromAmount = args[7];
 
+  if (!ONEINCH_API_KEY) throw new Error("Please set ONEINCH_API_KEY in the .env file");
+
   const data = await getIInchSwapData({
     chainId,
     fromAddress,
@@ -107,58 +25,7 @@ export const getData = async () => {
     fromAmount,
   });
 
-  console.log(recodeSwapData(data));
-};
-
-/**
- * Re-encodes the 1Inch swap data to be used by the vault's swapper.
- * The first 4 bytes are the function selector to call on 1Inch's router.
- * If calling the swap function, the next 20 bytes is the executer's address and data.
- * If calling the unoswap or uniswapV3SwapTo functions, an array of Uniswap pools are encoded.
- * @param {string} apiEncodedData tx.data from 1inch's /v6.0/1/swap API
- * @returns {string} RLP encoded data for the Vault's `swapCollateral` function
- */
-const recodeSwapData = (apiEncodedData: string): string => {
-  try {
-    const c1InchRouter = new ethers.Contract(
-      ONE_INCH_ROUTER_V6,
-      new ethers.utils.Interface(ONE_INCH_V6_ABI)
-    );
-
-    // decode the 1Inch tx.data that is RLP encoded
-    const swapTx = c1InchRouter.interface.parseTransaction({
-      data: apiEncodedData,
-    });
-
-    // log(`parsed tx ${JSON.stringify(swapTx)}}`);
-
-    let encodedData = "";
-    if (swapTx.sighash === SWAP_SELECTOR) {
-      // If swap(IAggregationExecutor executor, SwapDescription calldata desc, bytes calldata data)
-      encodedData = ethers.utils.defaultAbiCoder.encode(
-        ["bytes4", "address", "bytes"],
-        [swapTx.sighash, swapTx.args[0], swapTx.args[2]]
-      );
-    } else if (swapTx.sighash === UNOSWAP_TO_SELECTOR) {
-      // If unoswapTo(uint256,uint256,uint256,uint256,uint256)
-      encodedData = ethers.utils.defaultAbiCoder.encode(
-        ["bytes4", "uint256"],
-        [swapTx.sighash, swapTx.args[4]]
-      );
-    } else if (swapTx.sighash === UNOSWAP_TO_2_SELECTOR) {
-      // If unoswapTo(uint256,uint256,uint256,uint256,uint256)
-      encodedData = ethers.utils.defaultAbiCoder.encode(
-        ["bytes4", "uint256", "uint256"],
-        [swapTx.sighash, swapTx.args[4], swapTx.args[5]]
-      );
-    } else {
-      throw Error(`Unknown 1Inch tx signature ${swapTx.sighash}`);
-    }
-
-    return encodedData;
-  } catch (err: any) {
-    throw Error(`Failed to recode 1Inch swap data: ${err.message}`);
-  }
+  console.log(data);
 };
 
 /**
@@ -171,7 +38,7 @@ const recodeSwapData = (apiEncodedData: string): string => {
  * @param protocols The 1Inch liquidity sources as a comma separated list. eg UNISWAP_V1,UNISWAP_V2,SUSHI,CURVE,ONE_INCH_LIMIT_ORDER
  * See https://api.1inch.io/v5.0/1/liquidity-sources
  */
-const getIInchSwapData = async ({
+const getIInchSwapData = async({
   chainId,
   fromAddress,
   toAddress,

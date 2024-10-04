@@ -4,6 +4,7 @@ pragma solidity ^0.8.25;
 import {Test} from "forge-std/Test.sol";
 import {PriceProvider} from "../../src/PriceProvider.sol";
 import {IAggregatorV3} from "../../src/interfaces/IAggregatorV3.sol";
+import {UUPSProxy} from "../../src/UUPSProxy.sol";
 
 interface IWeETH {
     function getEETHByWeETH(
@@ -86,10 +87,19 @@ contract PriceProviderTest is Test {
         initialTokensConfig[0] = weETHConfig;
         initialTokensConfig[1] = btcConfig;
 
-        priceProvider = new PriceProvider(
-            governor,
-            initialTokens,
-            initialTokensConfig
+        address priceProviderImpl = address(new PriceProvider());
+        priceProvider = PriceProvider(
+            address(
+                new UUPSProxy(
+                    priceProviderImpl, 
+                    abi.encodeWithSelector(
+                        PriceProvider.initialize.selector,
+                        governor,
+                        initialTokens,
+                        initialTokensConfig
+                    )
+                )
+            )
         );
 
         vm.stopPrank();

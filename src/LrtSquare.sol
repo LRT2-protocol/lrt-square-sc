@@ -74,6 +74,8 @@ contract LRTSquare is
     uint256 public depositForCommunityPause;
     uint256 public communityPauseDepositedAmt;
 
+    uint256 public constant MAX_ALLOWED_UNDERVALUE = 1_000;
+
     event TokenRegistered(address token);
     event TokenWhitelisted(address token, bool whitelisted);
     event PriceProviderSet(address oldPriceProvider, address newPriceProvider);
@@ -102,6 +104,7 @@ contract LRTSquare is
     event RateLimitTimePeriodUpdated(uint64 oldTimePeriod, uint64 newTimePeriod);
     event TokenMaxPositionWeightLimitUpdated(uint64 oldLimit, uint64 newLimit);
     event RebalancerSet(address oldRebalancer, address newRebalancer);
+    event PauserSet(address oldPauser, address newPauser);
     event MaxSlippageForRebalanceSet(uint256 oldMaxSlippage, uint256 newMaxSlippage);
     event WhitelistRebalanceOutputToken(address token, bool whitelisted);
     event SwapperSet(address oldSwapper, address newSwapper);
@@ -145,7 +148,9 @@ contract LRTSquare is
         address __pauser,
         address __rebalancer,
         address __swapper,
-        uint128 __percentageLimit
+        address __priceProvider,
+        uint128 __percentageLimit,
+        uint256 __depositForCommunityPause
     ) public initializer {
         __ERC20_init(__name, __symbol);
         __ERC20Permit_init(__name);
@@ -155,6 +160,7 @@ contract LRTSquare is
         rebalancer = __rebalancer;
         swapper = __swapper;
         pauser = __pauser;
+        priceProvider = __priceProvider;
 
         // Initially allows 1000 ether in an hour with refill rate of 0.01 ether per seconds -> Max 1 hour -> 1036 shares
         // Updates every 1 hour -> new limit becomes percentageLimit * totalSupply
@@ -164,8 +170,15 @@ contract LRTSquare is
             renewTimestamp: uint64(block.timestamp + 3600),
             percentageLimit: __percentageLimit
         });
+        depositForCommunityPause = __depositForCommunityPause;
+
+        emit PauserSet(address(0), __pauser);
+        emit RebalancerSet(address(0), __rebalancer);
+        emit SwapperSet(address(0), __swapper);
+        emit PriceProviderSet(address(0), __priceProvider);
         emit PercentageRateLimitUpdated(0, __percentageLimit);
         emit RefillRateUpdated(0, 0.01 ether);
+        emit CommunityPauseDepositSet(0, __depositForCommunityPause);
 
         // 0.5%
         maxSlippageForRebalancing = 0.995 ether;
@@ -244,6 +257,12 @@ contract LRTSquare is
         if (account == address(0)) revert InvalidValue();
         emit RebalancerSet(rebalancer, account);
         rebalancer = account;
+    }
+
+    function setPauser(address account) external onlyGovernor {
+        if (account == address(0)) revert InvalidValue();
+        emit PauserSet(pauser, account);
+        pauser = account;
     }
 
     function setMaxSlippageForRebalancing(uint256 maxSlippage) external onlyRebalancer {
@@ -328,7 +347,7 @@ contract LRTSquare is
         if (_receiver == address(0)) revert InvalidRecipient();
 
         bool initialDeposit = (totalSupply() == 0);
-        uint256 VaultTokenValueBefore = getVaultTokenValuesInEth(
+        uint256 vaultTokenValueBefore = getVaultTokenValuesInEth(
             1 * 10 ** decimals()
         );
 
@@ -342,13 +361,16 @@ contract LRTSquare is
 
         _verifyPositionLimits();
 
-        uint256 VaultTokenValueAfter = getVaultTokenValuesInEth(
+        uint256 vaultTokenValueAfter = getVaultTokenValuesInEth(
             1 * 10 ** decimals()
         );
 
-        if (!initialDeposit && VaultTokenValueBefore != VaultTokenValueAfter)
-            revert VaultTokenValueChanged();
-
+        if (
+            !initialDeposit && 
+            vaultTokenValueBefore > vaultTokenValueAfter && 
+            vaultTokenValueBefore - vaultTokenValueAfter > MAX_ALLOWED_UNDERVALUE
+        ) revert VaultTokenValueChanged();
+        
         emit Deposit(msg.sender, _receiver, shareToMint, _tokens, _amounts);
     }
 
@@ -501,14 +523,15 @@ contract LRTSquare is
         uint256 vaultTokenShares
     ) public view returns (uint256) {
         uint256 totalSupply = totalSupply();
-        if (totalSupply == 0) {
-            return 0;
-        }
+        if (totalSupply == 0) return 0;
+
+        // 152981376626067400
 
         (
             address[] memory assets,
             uint256[] memory assetAmounts
         ) = totalAssets();
+
         uint256 totalValue = getTokenValuesInEth(assets, assetAmounts);
         return (totalValue * vaultTokenShares) / totalSupply;
     }

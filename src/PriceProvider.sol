@@ -4,16 +4,17 @@ pragma solidity ^0.8.25;
 import {IPriceProvider} from "./interfaces/IPriceProvider.sol";
 import {Governable} from "./governance/Governable.sol";
 import {IAggregatorV3} from "./interfaces/IAggregatorV3.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 
-contract PriceProvider is IPriceProvider, Governable {
+contract PriceProvider is IPriceProvider, Governable, Initializable, UUPSUpgradeable {
     using Math for uint256;
 
     enum ReturnType {
         Int256,
         Uint256
     }
-
+    
     struct Config {
         address oracle;
         bytes priceFunctionCalldata;
@@ -25,8 +26,9 @@ contract PriceProvider is IPriceProvider, Governable {
     }
 
     // ETH to USD price
-    address public constant ETH_USD_ORACLE_SELECTOR =
-        0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    address public constant ETH_USD_ORACLE_SELECTOR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+
     mapping(address token => Config tokenConfig) public tokenConfig;
 
     event TokenConfigSet(address[] tokens, Config[] configs);
@@ -36,11 +38,15 @@ contract PriceProvider is IPriceProvider, Governable {
     error InvalidPrice();
     error OraclePriceTooOld();
 
-    constructor(
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
         address __governor,
         address[] memory __tokens,
         Config[] memory __configs
-    ) Governable() {
+    ) external initializer {
         _setTokenConfig(__tokens, __configs);
         _setGovernor(__governor);
     }
@@ -53,7 +59,7 @@ contract PriceProvider is IPriceProvider, Governable {
     }
 
     function getPriceInEth(address token) external view returns (uint256) {
-        if (token == ETH_USD_ORACLE_SELECTOR) return 1 ether;
+        if (token == ETH_USD_ORACLE_SELECTOR || token == WETH) return 1 ether;
 
         (uint256 price, bool isBaseEth, uint8 priceDecimals) = _getPrice(token);
 
@@ -141,4 +147,6 @@ contract PriceProvider is IPriceProvider, Governable {
 
         emit TokenConfigSet(_tokens, _configs);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyGovernor {}
 }

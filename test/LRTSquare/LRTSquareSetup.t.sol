@@ -51,6 +51,7 @@ contract LRTSquareTestSetup is Utils {
     uint8[] tokenDecimals;
 
     uint128 percentageRateLimit = 5_000_000_000; // 500%
+    uint256 communityPauseDepositAmt = 100 ether;
 
     function setUp() public virtual {
         vm.startPrank(owner);
@@ -66,19 +67,6 @@ contract LRTSquareTestSetup is Utils {
         timelock.grantRole(timelock.EXECUTOR_ROLE(), address(0));
         timelock.renounceRole(timelock.DEFAULT_ADMIN_ROLE(), admin);
 
-        lrtSquare = LRTSquare(
-            address(new UUPSProxy(address(new LRTSquare()), ""))
-        );
-        lrtSquare.initialize(
-            "LrtSquare",
-            "LRT",
-            address(timelock),
-            pauser,
-            rebalancer, 
-            swapper,
-            percentageRateLimit
-        );
-        
         tokenDecimals.push(18);
         tokenDecimals.push(12);
         tokenDecimals.push(6);
@@ -87,9 +75,9 @@ contract LRTSquareTestSetup is Utils {
         tokenPrices.push(0.5 ether);
         tokenPrices.push(0.01 ether);
 
-        tokenPositionWeightLimits.push(lrtSquare.HUNDRED_PERCENT_LIMIT());
-        tokenPositionWeightLimits.push(lrtSquare.HUNDRED_PERCENT_LIMIT());
-        tokenPositionWeightLimits.push(lrtSquare.HUNDRED_PERCENT_LIMIT());
+        tokenPositionWeightLimits.push(HUNDRED_PERCENT_LIMIT);
+        tokenPositionWeightLimits.push(HUNDRED_PERCENT_LIMIT);
+        tokenPositionWeightLimits.push(HUNDRED_PERCENT_LIMIT);
 
         tokens.push(new MockERC20("Token1", "TK1", tokenDecimals[0]));
         tokens.push(new MockERC20("Token2", "TK2", tokenDecimals[1]));
@@ -104,6 +92,21 @@ contract LRTSquareTestSetup is Utils {
         tokens[0].mint(owner, 100 ether);
         tokens[1].mint(owner, 100 ether);
         tokens[2].mint(owner, 100 ether);
+
+        lrtSquare = LRTSquare(
+            address(new UUPSProxy(address(new LRTSquare()), ""))
+        );
+        lrtSquare.initialize(
+            "LrtSquare",
+            "LRT",
+            address(timelock),
+            pauser,
+            rebalancer, 
+            swapper,
+            address(priceProvider),
+            percentageRateLimit,
+            communityPauseDepositAmt
+        );
         vm.stopPrank();
 
         vm.prank(address(timelock));

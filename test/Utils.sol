@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 
 contract Utils is Test {
+    uint64 public constant HUNDRED_PERCENT_LIMIT = 1_000_000_000;
+
     function getQuoteOneInch(
         string memory chainId,
         address from,

@@ -18,6 +18,9 @@ struct ChainConfig {
 
 contract Utils is Script {
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    uint64 public constant HUNDRED_PERCENT_LIMIT = 1_000_000_000;
+
     function getChainConfig(
         string memory chainId
     ) internal view returns (ChainConfig memory) {
@@ -100,5 +103,27 @@ contract Utils is Script {
         string memory chainDir = string.concat(vm.toString(block.chainid), "/");
         string memory file = string.concat("deployments", ".json");
         vm.writeJson(output, string.concat(dir, chainDir, file));
+    }
+
+    function getQuoteOneInch(
+        string memory chainId,
+        address from,
+        address to,
+        address srcToken,
+        address dstToken,
+        uint256 amount
+    ) internal returns (bytes memory data) {
+        string[] memory inputs = new string[](9);
+        inputs[0] = "npx";
+        inputs[1] = "ts-node";
+        inputs[2] = "test/getQuote1Inch.ts";
+        inputs[3] = chainId;
+        inputs[4] = vm.toString(from);
+        inputs[5] = vm.toString(to);
+        inputs[6] = vm.toString(srcToken);
+        inputs[7] = vm.toString(dstToken);
+        inputs[8] = vm.toString(amount);
+
+        return vm.ffi(inputs);
     }
 }

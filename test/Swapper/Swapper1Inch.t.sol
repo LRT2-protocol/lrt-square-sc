@@ -19,11 +19,7 @@ contract Swapper1InchV6Test is Utils {
         string memory mainnet = "https://eth-pokt.nodies.app";
         vm.createSelectFork(mainnet);
 
-        address[] memory assets = new address[](2);
-        assets[0] = address(weETH);
-        assets[1] = address(btc);
-
-        swapper = new Swapper1InchV6(swapRouter1InchV6, assets);
+        swapper = new Swapper1InchV6(swapRouter1InchV6);
     }
 
     function test_Swap() public {
