@@ -49,6 +49,8 @@ contract LRTSquare is
         uint128 percentageLimit;
     }
 
+    uint64 public constant HUNDRED_PERCENT_LIMIT = 1_000_000_000;
+
     mapping(address => TokenInfo) public tokenInfos; 
     // only whitelisted depositors can deposit tokens into the vault
     mapping(address => bool) public depositor; 
@@ -68,13 +70,10 @@ contract LRTSquare is
     address public swapper; 
     // Swapper is a helper contract that helps us swap funds in the vault and rebalance 
     mapping(address => bool) public pauser;
-
-    uint64 public constant HUNDRED_PERCENT_LIMIT = 1_000_000_000;
-
+    // deposit amount for community pause in Eth
     uint256 public depositForCommunityPause;
+    // deposited amount after community pause
     uint256 public communityPauseDepositedAmt;
-
-    uint256 public constant MAX_ALLOWED_UNDERVALUE = 1_000;
 
     event TokenRegistered(address token);
     event TokenWhitelisted(address token, bool whitelisted);
@@ -189,7 +188,7 @@ contract LRTSquare is
         RateLimit memory _rateLimit = rateLimit;
         _rateLimit.limit.getCurrent();
         return _rateLimit;
-    } 
+    }
 
     function whitelistRebalacingOutputToken(address _token, bool _shouldWhitelist) external onlyGovernor {
         if (_token == address(0)) revert InvalidValue();
@@ -368,11 +367,7 @@ contract LRTSquare is
             1 * 10 ** decimals()
         );
 
-        if (
-            !initialDeposit && 
-            vaultTokenValueBefore > vaultTokenValueAfter && 
-            vaultTokenValueBefore - vaultTokenValueAfter > MAX_ALLOWED_UNDERVALUE
-        ) revert VaultTokenValueChanged();
+        if (!initialDeposit && vaultTokenValueBefore > vaultTokenValueAfter) revert VaultTokenValueChanged();
         
         emit Deposit(msg.sender, _receiver, shareToMint, _tokens, _amounts);
     }
