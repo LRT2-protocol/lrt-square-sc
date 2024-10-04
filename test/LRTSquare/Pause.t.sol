@@ -13,15 +13,49 @@ contract LRTSquarePauseTest is LRTSquareTestSetup {
         address newPauser = makeAddr("newPauser");
         vm.prank(address(timelock));
         vm.expectEmit(true, true, true, true);
-        emit LRTSquare.PauserSet(pauser, newPauser);
-        lrtSquare.setPauser(newPauser);
+        emit LRTSquare.PauserSet(newPauser, true);
+        lrtSquare.setPauser(newPauser, true);
+        
+        vm.prank(address(timelock)); 
+        vm.expectEmit(true, true, true, true);
+        emit LRTSquare.PauserSet(newPauser, false);
+        lrtSquare.setPauser(newPauser, false);
+    }
+
+    function test_CanAddMultiplePausers() public {
+        address newPauser1 = makeAddr("newPauser1");
+        address newPauser2 = makeAddr("newPauser2");
+        address newPauser3 = makeAddr("newPauser3");
+
+        vm.startPrank(address(timelock));
+        lrtSquare.setPauser(newPauser1, true);
+        lrtSquare.setPauser(newPauser2, true);
+        lrtSquare.setPauser(newPauser3, true);
+        vm.stopPrank();
+
+        assertEq(lrtSquare.pauser(newPauser1), true);
+        assertEq(lrtSquare.pauser(newPauser2), true);
+        assertEq(lrtSquare.pauser(newPauser3), true);
+    }
+
+    function test_CannotSetPauserInSameState() public {
+        vm.prank(address(timelock));
+        vm.expectRevert(LRTSquare.AlreadyInSameState.selector);
+        lrtSquare.setPauser(pauser, true);
+
+        vm.prank(address(timelock));
+        lrtSquare.setPauser(pauser, false);
+        
+        vm.prank(address(timelock));
+        vm.expectRevert(LRTSquare.AlreadyInSameState.selector);
+        lrtSquare.setPauser(pauser, false);
     }
 
     function test_OnlyGovernorCanSetPauser() public {
         address newPauser = makeAddr("newPauser");
         vm.prank(address(newPauser));
         vm.expectRevert(Governable.OnlyGovernor.selector);
-        lrtSquare.setPauser(newPauser);
+        lrtSquare.setPauser(newPauser, true);
     }
 
     function test_PauserCanPause() public {
@@ -140,21 +174,17 @@ contract LRTSquarePauseTest is LRTSquareTestSetup {
     }
 
     function test_CanUnpauseAfterCommunityPause() public {
-        uint256 depositAmt = 100 ether;
-        vm.prank(address(timelock));
-        lrtSquare.setCommunityPauseDepositAmount(depositAmt);
-
         assertEq(lrtSquare.paused(), false);
 
-        deal(alice, depositAmt);
+        deal(alice, communityPauseDepositAmt);
         vm.prank(alice);
-        lrtSquare.communityPause{value: depositAmt}();
+        lrtSquare.communityPause{value: communityPauseDepositAmt}();
 
         assertEq(lrtSquare.paused(), true);
 
-        vm.startPrank(pauser);
         lrtSquare.withdrawCommunityDepositedPauseAmount();
 
+        vm.prank(pauser);
         lrtSquare.unpause();
         assertEq(lrtSquare.paused(), false);
 
@@ -162,27 +192,43 @@ contract LRTSquarePauseTest is LRTSquareTestSetup {
     }
 
     function test_CanUnpauseIfCommunityPauseDepositNotWithdrawn() public {
-        uint256 depositAmt = 100 ether;
-        vm.prank(address(timelock));
-        lrtSquare.setCommunityPauseDepositAmount(depositAmt);
-
         assertEq(lrtSquare.paused(), false);
 
-        deal(alice, depositAmt);
+        deal(alice, communityPauseDepositAmt);
         vm.prank(alice);
-        lrtSquare.communityPause{value: depositAmt}();
+        lrtSquare.communityPause{value: communityPauseDepositAmt}();
 
         assertEq(lrtSquare.paused(), true);
 
-        uint256 balBefore = pauser.balance;
+        uint256 balBefore = address(timelock).balance;
 
         vm.prank(pauser);
         lrtSquare.unpause();
 
-        uint256 balAfter = pauser.balance;
+        uint256 balAfter = address(timelock).balance;
 
-        assertGt(balAfter, balBefore);
+        assertEq(balAfter - balBefore, communityPauseDepositAmt);
     }
+
+    function test_WithdrawCommunityPauseDepositIsPermissionless() public {
+        assertEq(lrtSquare.paused(), false);
+
+        deal(alice, communityPauseDepositAmt);
+        vm.prank(alice);
+        lrtSquare.communityPause{value: communityPauseDepositAmt}();
+
+        assertEq(lrtSquare.paused(), true);
+
+        uint256 balBefore = address(timelock).balance;
+
+        address newAddr = makeAddr("newAddr");
+        vm.prank(newAddr);
+        emit LRTSquare.CommunityPauseAmountWithdrawal(address(timelock), communityPauseDepositAmt);
+        lrtSquare.withdrawCommunityDepositedPauseAmount();
+        uint256 balAfter = address(timelock).balance;
+
+        assertEq(balAfter - balBefore, communityPauseDepositAmt);
+    }       
 
     function test_CannotDepositWhenPaused() public {
         vm.prank(pauser);

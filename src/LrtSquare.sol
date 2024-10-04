@@ -67,7 +67,7 @@ contract LRTSquare is
     // Swapper is a helper contract that helps us swap funds in the vault and rebalance 
     address public swapper; 
     // Swapper is a helper contract that helps us swap funds in the vault and rebalance 
-    address public pauser;
+    mapping(address => bool) public pauser;
 
     uint64 public constant HUNDRED_PERCENT_LIMIT = 1_000_000_000;
 
@@ -96,7 +96,7 @@ contract LRTSquare is
     event CommunityPauseDepositSet(uint256 oldAmount, uint256 newAmount);
     event CommunityPause(address indexed pauser);
     event CommunityPauseAmountWithdrawal(
-        address indexed withdrawer,
+        address indexed recipient,
         uint256 amount
     );
     event RefillRateUpdated(uint128 oldRate, uint128 newRate);
@@ -104,7 +104,7 @@ contract LRTSquare is
     event RateLimitTimePeriodUpdated(uint64 oldTimePeriod, uint64 newTimePeriod);
     event TokenMaxPositionWeightLimitUpdated(uint64 oldLimit, uint64 newLimit);
     event RebalancerSet(address oldRebalancer, address newRebalancer);
-    event PauserSet(address oldPauser, address newPauser);
+    event PauserSet(address pauser, bool isPauser);
     event MaxSlippageForRebalanceSet(uint256 oldMaxSlippage, uint256 newMaxSlippage);
     event WhitelistRebalanceOutputToken(address token, bool whitelisted);
     event SwapperSet(address oldSwapper, address newSwapper);
@@ -135,6 +135,7 @@ contract LRTSquare is
     error NotAValidRebalanceOutputToken();
     error InsufficientTokensReceivedFromSwapper();
     error ApplicableSlippageGreaterThanMaxLimit();
+    error AlreadyInSameState();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -159,7 +160,7 @@ contract LRTSquare is
         _setGovernor(__governor);
         rebalancer = __rebalancer;
         swapper = __swapper;
-        pauser = __pauser;
+        pauser[__pauser] = true;
         priceProvider = __priceProvider;
 
         // Initially allows 1000 ether in an hour with refill rate of 0.01 ether per seconds -> Max 1 hour -> 1036 shares
@@ -172,7 +173,7 @@ contract LRTSquare is
         });
         depositForCommunityPause = __depositForCommunityPause;
 
-        emit PauserSet(address(0), __pauser);
+        emit PauserSet(__pauser, true);
         emit RebalancerSet(address(0), __rebalancer);
         emit SwapperSet(address(0), __swapper);
         emit PriceProviderSet(address(0), __priceProvider);
@@ -259,10 +260,12 @@ contract LRTSquare is
         rebalancer = account;
     }
 
-    function setPauser(address account) external onlyGovernor {
+    function setPauser(address account, bool isPauser) external onlyGovernor {
         if (account == address(0)) revert InvalidValue();
-        emit PauserSet(pauser, account);
-        pauser = account;
+        if (pauser[account] == isPauser) revert AlreadyInSameState();
+        
+        pauser[account] = isPauser;
+        emit PauserSet(account, isPauser);
     }
 
     function setMaxSlippageForRebalancing(uint256 maxSlippage) external onlyRebalancer {
@@ -554,21 +557,21 @@ contract LRTSquare is
         uint256 amount = communityPauseDepositedAmt;
         if (amount != 0) {
             communityPauseDepositedAmt = 0;
-            _withdrawEth(msg.sender, amount);
-            emit CommunityPauseAmountWithdrawal(msg.sender, amount);
+            _withdrawEth(governor(), amount);
+            emit CommunityPauseAmountWithdrawal(governor(), amount);
         }
 
         _unpause();
     }
 
-    function withdrawCommunityDepositedPauseAmount() public onlyPauser {
+    function withdrawCommunityDepositedPauseAmount() external {
         uint256 amount = communityPauseDepositedAmt;
 
         if (amount == 0) revert NoCommunityPauseDepositAvailable();
         communityPauseDepositedAmt = 0;
-        _withdrawEth(msg.sender, amount);
+        _withdrawEth(governor(), amount);
 
-        emit CommunityPauseAmountWithdrawal(msg.sender, amount);
+        emit CommunityPauseAmountWithdrawal(governor(), amount);
     }
 
     function setCommunityPauseDepositAmount(uint256 amount) external onlyGovernor {
@@ -701,7 +704,7 @@ contract LRTSquare is
     }
 
     function _onlyPauser() internal view {
-        if (pauser != msg.sender) revert OnlyPauser();
+        if (!pauser[msg.sender]) revert OnlyPauser();
     }
 
     modifier updateRateLimit {
