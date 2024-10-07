@@ -30,8 +30,8 @@ contract DeployLRTSquare is Utils {
 
     uint64[] tokenPositionWeightLimits;
 
-    uint128 percentageRateLimit = 5_000_000_000; // 500%
-    uint256 communityPauseDepositAmt = 10 ether;
+    uint128 percentageRateLimit = 10_000_000_000; // 1000%
+    uint256 communityPauseDepositAmt = 4 ether;
 
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
