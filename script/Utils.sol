@@ -6,6 +6,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 
 struct ChainConfig {
     address owner;
+    address treasury;
     address rebalancer;
     address pauser;
     address ethfi;
@@ -14,6 +15,8 @@ struct ChainConfig {
     address eigenChainlinkOracle;
     address ethUsdChainlinkOracle;
     address swapRouter1InchV6;
+    uint48 depositFeeInBps;
+    uint48 redeemFeeInBps;
 }
 
 contract Utils is Script {
@@ -35,6 +38,11 @@ contract Utils is Script {
         address owner = stdJson.readAddress(
             inputJson,
             string.concat(".", chainId, ".", "owner")
+        );
+
+        address treasury = stdJson.readAddress(
+            inputJson,
+            string.concat(".", chainId, ".", "treasury")
         );
 
         address rebalancer = stdJson.readAddress(
@@ -77,9 +85,20 @@ contract Utils is Script {
             string.concat(".", chainId, ".", "swapRouter1InchV6")
         );
 
+        uint48 depositFeeInBps = uint48(stdJson.readUint(
+            inputJson, 
+            string.concat(".", chainId, ".", "depositFeeInBps")
+        ));
+
+        uint48 redeemFeeInBps = uint48(stdJson.readUint(
+            inputJson, 
+            string.concat(".", chainId, ".", "redeemFeeInBps")
+        ));
+
         return
             ChainConfig({
                 owner: owner,
+                treasury: treasury,
                 rebalancer: rebalancer,
                 pauser: pauser,
                 ethfi: ethfi,
@@ -87,7 +106,9 @@ contract Utils is Script {
                 ethfiChainlinkOracle: ethfiChainlinkOracle,
                 eigenChainlinkOracle: eigenChainlinkOracle,
                 ethUsdChainlinkOracle: ethUsdChainlinkOracle,
-                swapRouter1InchV6: swapRouter1InchV6
+                swapRouter1InchV6: swapRouter1InchV6,
+                depositFeeInBps: depositFeeInBps,
+                redeemFeeInBps: redeemFeeInBps
             });
     }
 

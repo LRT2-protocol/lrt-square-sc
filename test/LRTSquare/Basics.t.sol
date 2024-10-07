@@ -2,9 +2,11 @@
 pragma solidity ^0.8.25;
 
 import {LRTSquareTestSetup, LRTSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract LRTSquareBasicsTest is LRTSquareTestSetup {
     using SafeERC20 for IERC20;
+    using Math for uint256;
 
     function setUp() public override {
         super.setUp();
@@ -109,9 +111,20 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
             _amounts
         );
         uint256 expectedShares = _getSharesForEth(totalValueInEth);
+
+        uint256 depositFee = expectedShares.mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
+        expectedShares -= depositFee;
+
+        (uint256 sharesToMint, uint256 feeForDeposit) = lrtSquare.previewDeposit(_tokens, _amounts);
+
         assertApproxEqAbs(
-            lrtSquare.previewDeposit(_tokens, _amounts),
+            sharesToMint,
             expectedShares,
+            1
+        );
+        assertApproxEqAbs(
+            depositFee,
+            feeForDeposit,
             1
         );
 
@@ -127,10 +140,21 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         uint256 expectedSharesAfterDeposit = _getSharesForEth(
             totalValueInEthAfterDeposit
         );
+        depositFee = expectedSharesAfterDeposit.mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
+        expectedSharesAfterDeposit -= depositFee;
+
+        (sharesToMint, feeForDeposit) = lrtSquare.previewDeposit(_tokens, _amounts);
+
 
         assertApproxEqAbs(
-            lrtSquare.previewDeposit(_tokens, _amounts),
+            sharesToMint,
             expectedSharesAfterDeposit,
+            1
+        );
+
+        assertApproxEqAbs(
+            depositFee,
+            feeForDeposit,
             1
         );
     }
@@ -154,6 +178,8 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
             _amounts
         );
         uint256 sharesMinted = _getSharesForEth(totalValueInEth);
+        uint256 fee = sharesMinted.mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
+        sharesMinted -= fee;
 
         uint256 assetOfAliceInToken0 = _getAssetForVaultShares(
             sharesMinted,
@@ -197,6 +223,11 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         _expectedAmounts[0] = 1 * 10 ** tokenDecimals[_tokenIndices[0]];
         _expectedAmounts[1] = 5 * 10 ** tokenDecimals[_tokenIndices[1]];
         _expectedAmounts[2] = 0;
+
+        // Deduct the fee from here because it was already deducted when user deposited
+        _expectedAmounts[0] -= _expectedAmounts[0].mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
+        _expectedAmounts[1] -= _expectedAmounts[1].mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
+        _expectedAmounts[2] -= _expectedAmounts[2].mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
 
         assertEq(_tokensFromContract, _expectedTokens);
         assertApproxEqAbs(_amountsFromContract[0], _expectedAmounts[0], 10);

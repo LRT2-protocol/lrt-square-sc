@@ -28,6 +28,7 @@ contract LRTSquareTestSetup is Utils {
     using SafeERC20 for IERC20;
 
     address pauser = makeAddr("pauser");
+    address treasury = makeAddr("treasury");
     LRTSquare public lrtSquare;
 
     MockERC20[] public tokens;
@@ -52,6 +53,9 @@ contract LRTSquareTestSetup is Utils {
 
     uint128 percentageRateLimit = 5_000_000_000; // 500%
     uint256 communityPauseDepositAmt = 100 ether;
+        
+    uint48 depositFeeInBps = 10;
+    uint48 redeemFeeInBps = 10;
 
     function setUp() public virtual {
         vm.startPrank(owner);
@@ -93,6 +97,12 @@ contract LRTSquareTestSetup is Utils {
         tokens[1].mint(owner, 100 ether);
         tokens[2].mint(owner, 100 ether);
 
+        LRTSquare.Fee memory fee = LRTSquare.Fee({
+            treasury: treasury,
+            depositFeeInBps: depositFeeInBps,
+            redeemFeeInBps: redeemFeeInBps
+        });
+
         lrtSquare = LRTSquare(
             address(new UUPSProxy(address(new LRTSquare()), ""))
         );
@@ -105,7 +115,8 @@ contract LRTSquareTestSetup is Utils {
             swapper,
             address(priceProvider),
             percentageRateLimit,
-            communityPauseDepositAmt
+            communityPauseDepositAmt,
+            fee
         );
         vm.stopPrank();
 

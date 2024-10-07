@@ -2,8 +2,11 @@
 pragma solidity ^0.8.25;
 
 import {LRTSquareTestSetup, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
+    using Math for uint256;    
+    
     function setUp() public override {
         super.setUp();
 
@@ -40,9 +43,11 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
             assets[0] = address(tokens[0]);
             amounts[0] = 100 ether;
 
+            (uint256 sharesToMint, ) = lrtSquare.previewDeposit(assets, amounts);
+
             assertApproxEqAbs(
-                lrtSquare.previewDeposit(assets, amounts),
-                (amounts[0] * tokenPrices[0]) / 1 ether,
+                sharesToMint,
+                _deductFee((amounts[0] * tokenPrices[0]) / 1 ether),
                 1
             ); // 100 ether * 0.1 ether / 1 ether = 10 ether worth
             lrtSquare.deposit(assets, amounts, merkleDistributor);
@@ -75,8 +80,8 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
             amounts[0] = 200 ether;
 
             assertApproxEqAbs(
-                lrtSquare.previewDeposit(assets, amounts),
-                (amounts[0] * tokenPrices[0]) / 1 ether,
+                _getSharesToMint(assets, amounts),
+                _deductFee((amounts[0] * tokenPrices[0]) / 1 ether),
                 1
             ); // 200 ether * 0.1 ether / 1 ether = 20 ether worth
             lrtSquare.deposit(assets, amounts, merkleDistributor);
@@ -117,8 +122,8 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
             // 100 ether = (100 + 200 + 100) ether / (10 + 20 + x)
             // => x = (100 + 200 + 100) * 0.1 (price of token0) - (10 + 20) = 1
             assertApproxEqAbs(
-                lrtSquare.previewDeposit(assets, amounts),
-                (amounts[0] * tokenPrices[0]) / 1 ether,
+                _getSharesToMint(assets, amounts),
+                _deductFee((amounts[0] * tokenPrices[0]) / 1 ether),
                 1
             ); // 100 ether * 0.1 ether / 1 ether = 10 ether worth
             lrtSquare.deposit(assets, amounts, merkleDistributor);
@@ -170,11 +175,11 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
             // To maintain the value of each share, new shares equivalent to the proportion of the increase must be minted.
             // Execute 'distributeRewards' operation
             assertApproxEqAbs(
-                lrtSquare.previewDeposit(assets, amounts),
-                (amounts[0] * tokenPrices[0]) /
+                _getSharesToMint(assets, amounts),
+                _deductFee((amounts[0] * tokenPrices[0]) /
                     10 ** tokenDecimals[0] +
                     (amounts[1] * tokenPrices[1]) /
-                    10 ** tokenDecimals[1],
+                    10 ** tokenDecimals[1]),
                 1
             ); // 100 * 0.1 ether + 10 * 0.5 ether = 15 ether worth
             lrtSquare.deposit(assets, amounts, merkleDistributor);
@@ -185,5 +190,17 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
             );
             vm.stopPrank();
         }
+    }
+
+    function _deductFee(uint256 amount) internal view returns (uint256) {
+        return amount - amount.mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
+    }
+
+    function _getSharesToMint(
+        address[] memory assets, 
+        uint256[] memory amounts
+    ) internal view returns (uint256) {
+        (uint256 sharesToMint, ) = lrtSquare.previewDeposit(assets, amounts);
+        return sharesToMint;
     }
 }

@@ -37,11 +37,23 @@ contract LRTSquareRateLimitTest is LRTSquareTestSetup {
         assets.push(address(tokens[0]));
         amounts.push(initialDeposit);
 
-        assertApproxEqAbs(
-            lrtSquare.previewDeposit(assets, amounts),
-            (amounts[0] * tokenPrices[0]) / 1 ether,
+        (uint256 sharesToMint, uint256 feeForDeposit) = lrtSquare.previewDeposit(assets, amounts);
+        uint256 expectedShares = (amounts[0] * tokenPrices[0]) / 1 ether;
+        uint256 depositFee = expectedShares.mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
+        expectedShares -= depositFee;
+
+        assertApproxEqAbs(  
+            sharesToMint,
+            expectedShares,
             1
         ); 
+
+        assertApproxEqAbs(  
+            feeForDeposit,
+            depositFee,
+            1
+        ); 
+
         // 100 ether * 0.1 ether / 1 ether = 10 ether worth
         lrtSquare.deposit(assets, amounts, merkleDistributor);
         // 10 ether LRT^2 == {tokens[0]: 100 ether}
@@ -71,12 +83,15 @@ contract LRTSquareRateLimitTest is LRTSquareTestSetup {
             amounts
         );
         uint256 expectedSharesAfterDeposit = totalValueInEthAfterDeposit;
+        uint256 fee = expectedSharesAfterDeposit.mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
+        expectedSharesAfterDeposit -= fee;
 
         vm.expectEmit(true, true, true, true);
         emit LRTSquare.Deposit(
             owner,
             merkleDistributor,
             expectedSharesAfterDeposit,
+            fee,
             assets,
             amounts
         );
@@ -104,12 +119,15 @@ contract LRTSquareRateLimitTest is LRTSquareTestSetup {
             amounts
         );
         uint256 expectedSharesAfterDeposit = totalValueInEthAfterDeposit;
+        uint256 depositFee = expectedSharesAfterDeposit.mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
+        expectedSharesAfterDeposit -= depositFee;
 
         vm.expectEmit(true, true, true, true);
         emit LRTSquare.Deposit(
             owner,
             merkleDistributor,
             expectedSharesAfterDeposit,
+            depositFee,
             assets,
             amounts
         );

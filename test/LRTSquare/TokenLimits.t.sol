@@ -2,8 +2,11 @@
 pragma solidity ^0.8.25;
 
 import {LRTSquareTestSetup, LRTSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
+    using Math for uint256;
+
     uint256 initialDepositToken0 = 100 ether;
     
     uint256[] assetIndices;
@@ -31,11 +34,22 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
         assets.push(address(tokens[0]));
         amounts.push(initialDepositToken0);
 
+        (uint256 sharesToMint, uint256 feeForDeposit) = lrtSquare.previewDeposit(assets, amounts);
+        uint256 expectedShares = (amounts[0] * tokenPrices[0]) / 1 ether;
+        uint256 fee = expectedShares.mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
+        expectedShares -= fee;
+
         assertApproxEqAbs(
-            lrtSquare.previewDeposit(assets, amounts),
-            (amounts[0] * tokenPrices[0]) / 1 ether,
+            sharesToMint,
+            expectedShares,
             1
         ); 
+        assertApproxEqAbs(
+            feeForDeposit,
+            fee,
+            1
+        ); 
+        
         // 100 ether * 0.1 ether / 1 ether = 10 ether worth
         lrtSquare.deposit(assets, amounts, merkleDistributor);
         // 10 ether LRT^2 == {tokens[0]: 100 ether}

@@ -2,9 +2,11 @@
 pragma solidity ^0.8.25;
 
 import {LRTSquareTestSetup, LRTSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract LRTSquareDepositTest is LRTSquareTestSetup {
     using SafeERC20 for IERC20;
+    using Math for uint256;
 
     function setUp() public override {
         super.setUp();
@@ -41,6 +43,8 @@ contract LRTSquareDepositTest is LRTSquareTestSetup {
             _amounts
         );
         uint256 expectedSharesAfterDeposit = totalValueInEthAfterDeposit;
+        uint256 depositFee = expectedSharesAfterDeposit.mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
+        expectedSharesAfterDeposit -= depositFee;
 
         vm.startPrank(alice);
         for (uint256 i = 0; i < _tokens.length; ) {
@@ -59,6 +63,7 @@ contract LRTSquareDepositTest is LRTSquareTestSetup {
             alice,
             alice,
             expectedSharesAfterDeposit,
+            depositFee,
             _tokens,
             _amounts
         );
@@ -72,23 +77,28 @@ contract LRTSquareDepositTest is LRTSquareTestSetup {
         );
 
         assertApproxEqAbs(
+            lrtSquare.balanceOf(treasury),
+            depositFee,
+            10
+        );
+
+        assertApproxEqAbs(
             lrtSquare.assetOf(alice, address(tokens[0])),
-            _amounts[0],
+            _amounts[0].mulDiv(HUNDRED_PERCENT_IN_BPS - depositFeeInBps, HUNDRED_PERCENT_IN_BPS),
             10
         );
         assertApproxEqAbs(
             lrtSquare.assetOf(alice, address(tokens[1])),
-            _amounts[1],
+            _amounts[1].mulDiv(HUNDRED_PERCENT_IN_BPS - depositFeeInBps, HUNDRED_PERCENT_IN_BPS),
             10
         );
         assertApproxEqAbs(
             lrtSquare.assetOf(alice, address(tokens[2])),
-            _amounts[2],
+            _amounts[2].mulDiv(HUNDRED_PERCENT_IN_BPS - depositFeeInBps, HUNDRED_PERCENT_IN_BPS),
             10
         );
 
-        (address[] memory assets, uint256[] memory assetAmounts) = lrtSquare
-            .totalAssets();
+        (address[] memory assets, uint256[] memory assetAmounts) = lrtSquare.totalAssets();
         assertEq(assets.length, 3);
         assertEq(assetAmounts.length, 3);
 

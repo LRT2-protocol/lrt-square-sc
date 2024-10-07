@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 contract Utils is Test {
     uint64 public constant HUNDRED_PERCENT_LIMIT = 1_000_000_000;
+    uint48 public constant HUNDRED_PERCENT_IN_BPS = 10000;
 
     function getQuoteOneInch(
         string memory chainId,

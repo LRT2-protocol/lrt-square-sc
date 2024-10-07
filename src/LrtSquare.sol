@@ -49,7 +49,14 @@ contract LRTSquare is
         uint128 percentageLimit;
     }
 
+    struct Fee {
+        address treasury;
+        uint48 depositFeeInBps;
+        uint48 redeemFeeInBps;
+    }
+
     uint64 public constant HUNDRED_PERCENT_LIMIT = 1_000_000_000;
+    uint64 public constant HUNDRED_PERCENT_IN_BPS = 10000;
 
     mapping(address => TokenInfo) public tokenInfos; 
     // only whitelisted depositors can deposit tokens into the vault
@@ -74,30 +81,18 @@ contract LRTSquare is
     uint256 public depositForCommunityPause;
     // deposited amount after community pause
     uint256 public communityPauseDepositedAmt;
+    // fee struct
+    Fee public fee;
 
     event TokenRegistered(address token);
     event TokenWhitelisted(address token, bool whitelisted);
     event PriceProviderSet(address oldPriceProvider, address newPriceProvider);
     event DepositorsSet(address[] accounts, bool[] isDepositor);
-    event Deposit(
-        address indexed sender,
-        address indexed recipient,
-        uint256 sharesMinted,
-        address[] tokens,
-        uint256[] amounts
-    );
-    event Redeem(
-        address indexed account,
-        uint256 sharesRedeemed,
-        address[] tokens,
-        uint256[] amounts
-    );
+    event Deposit(address indexed sender, address indexed recipient, uint256 sharesMinted, uint256 fee, address[] tokens, uint256[] amounts);
+    event Redeem(address indexed account, uint256 sharesRedeemed, uint256 fee, address[] tokens, uint256[] amounts);
     event CommunityPauseDepositSet(uint256 oldAmount, uint256 newAmount);
     event CommunityPause(address indexed pauser);
-    event CommunityPauseAmountWithdrawal(
-        address indexed recipient,
-        uint256 amount
-    );
+    event CommunityPauseAmountWithdrawal(address indexed recipient, uint256 amount);
     event RefillRateUpdated(uint128 oldRate, uint128 newRate);
     event PercentageRateLimitUpdated(uint128 oldPercentage, uint128 newPercentage);
     event RateLimitTimePeriodUpdated(uint64 oldTimePeriod, uint64 newTimePeriod);
@@ -108,6 +103,8 @@ contract LRTSquare is
     event WhitelistRebalanceOutputToken(address token, bool whitelisted);
     event SwapperSet(address oldSwapper, address newSwapper);
     event Rebalance(address fromAsset, address toAsset, uint256 fromAssetAmount,uint256 toAssetAmount);
+    event FeeSet(Fee oldFee, Fee newFee);
+    event TreasurySet(address oldTreasury, address newTreasury);
 
     error TokenAlreadyRegistered();
     error TokenNotWhitelisted();
@@ -136,6 +133,8 @@ contract LRTSquare is
     error ApplicableSlippageGreaterThanMaxLimit();
     error AlreadyInSameState();
 
+    
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -150,7 +149,8 @@ contract LRTSquare is
         address __swapper,
         address __priceProvider,
         uint128 __percentageLimit,
-        uint256 __depositForCommunityPause
+        uint256 __depositForCommunityPause,
+        Fee memory __fee
     ) public initializer {
         __ERC20_init(__name, __symbol);
         __ERC20Permit_init(__name);
@@ -171,6 +171,7 @@ contract LRTSquare is
             percentageLimit: __percentageLimit
         });
         depositForCommunityPause = __depositForCommunityPause;
+        _setFee(__fee);
 
         emit PauserSet(__pauser, true);
         emit RebalancerSet(address(0), __rebalancer);
@@ -200,6 +201,16 @@ contract LRTSquare is
 
         isWhitelistedRebalanceOutputToken[_token] = _shouldWhitelist;
         emit WhitelistRebalanceOutputToken(_token, _shouldWhitelist);
+    }
+
+    function setFee(Fee memory _fee) external onlyGovernor {
+        _setFee(_fee);
+    }
+
+    function setTreasuryAddress(address treasury) external onlyGovernor {
+        if (treasury == address(0)) revert InvalidValue();
+        emit TreasurySet(fee.treasury, treasury);
+        fee.treasury = treasury;
     }
 
     function setSwapper(address _swapper) external onlyGovernor {
@@ -353,13 +364,13 @@ contract LRTSquare is
             1 * 10 ** decimals()
         );
 
-        uint256 shareToMint = previewDeposit(_tokens, _amounts);        
+        (uint256 shareToMint, uint256 depositFee) = previewDeposit(_tokens, _amounts);        
         // if initial deposit, set renew timestamp to new timestamp
         if (initialDeposit) rateLimit.renewTimestamp = uint64(block.timestamp + rateLimit.timePeriod);
         // check rate limit
-        if(!rateLimit.limit.consume(uint128(shareToMint))) revert RateLimitExceeded();
+        if(!rateLimit.limit.consume(uint128(shareToMint + depositFee))) revert RateLimitExceeded();
         
-        _deposit(_tokens, _amounts, shareToMint, _receiver);
+        _deposit(_tokens, _amounts, shareToMint, depositFee, _receiver);
 
         _verifyPositionLimits();
 
@@ -369,33 +380,37 @@ contract LRTSquare is
 
         if (!initialDeposit && vaultTokenValueBefore > vaultTokenValueAfter) revert VaultTokenValueChanged();
         
-        emit Deposit(msg.sender, _receiver, shareToMint, _tokens, _amounts);
+        emit Deposit(msg.sender, _receiver, shareToMint, depositFee, _tokens, _amounts);
     }
 
     /// @notice Redeem the underlying assets proportionate to the share of the caller.
     /// @param vaultShares amount of vault share token to redeem the underlying assets
     function redeem(uint256 vaultShares) external {
         if (balanceOf(msg.sender) < vaultShares) revert InsufficientShares();
-
-        (
-            address[] memory assets,
-            uint256[] memory assetAmounts
-        ) = assetsForVaultShares(vaultShares);
-
-        _burn(msg.sender, vaultShares);
+        
+        (address[] memory assets, uint256[] memory assetAmounts, uint256 feeForRedemption) = previewRedeem(vaultShares);
+        if (feeForRedemption != 0) _transfer(msg.sender, fee.treasury, feeForRedemption);
+        _burn(msg.sender, vaultShares - feeForRedemption);
 
         for (uint256 i = 0; i < assets.length; i++) 
             if (assetAmounts[i] > 0) IERC20(assets[i]).safeTransfer(msg.sender, assetAmounts[i]);
 
-        emit Redeem(msg.sender, vaultShares, assets, assetAmounts);
+        emit Redeem(msg.sender, vaultShares, feeForRedemption, assets, assetAmounts);
     }
 
-    function previewDeposit(
-        address[] memory _tokens,
-        uint256[] memory _amounts
-    ) public view returns (uint256) {
+    function previewDeposit(address[] memory _tokens, uint256[] memory _amounts) public view returns (uint256, uint256) {
         uint256 rewardsValueInEth = getTokenValuesInEth(_tokens, _amounts);
-        return _convertToShares(rewardsValueInEth, Math.Rounding.Floor);
+        uint256 shareToMint = _convertToShares(rewardsValueInEth, Math.Rounding.Floor);
+        uint256 feeForDeposit = shareToMint.mulDiv(fee.depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
+
+        return (shareToMint - feeForDeposit, feeForDeposit);
+    }
+
+    function previewRedeem(uint256 vaultShares) public view returns (address[] memory, uint256[] memory, uint256) {
+        uint256 feeForRedemption = vaultShares.mulDiv(fee.redeemFeeInBps, HUNDRED_PERCENT_IN_BPS);
+        (address[] memory assets, uint256[] memory assetAmounts) = assetsForVaultShares(vaultShares - feeForRedemption);
+
+        return (assets, assetAmounts, feeForRedemption);
     }
 
     function assetOf(
@@ -605,11 +620,13 @@ contract LRTSquare is
     /// @param _tokens addresses of ERC20 tokens to deposit
     /// @param amounts amounts of tokens to deposit
     /// @param shareToMint amount of share token (= LRT^2 token) to mint
+    /// @param depositFee fee to mint to the treasury 
     /// @param recipientForMintedShare recipient of the minted share token
     function _deposit(
         address[] memory _tokens,
         uint256[] memory amounts,
         uint256 shareToMint,
+        uint256 depositFee,
         address recipientForMintedShare
     ) internal {
         for (uint256 i = 0; i < _tokens.length; ) {
@@ -621,6 +638,7 @@ contract LRTSquare is
             }
         }
 
+        if (depositFee != 0) _mint(fee.treasury, depositFee);
         _mint(recipientForMintedShare, shareToMint);
     }
 
@@ -650,6 +668,17 @@ contract LRTSquare is
 
     function _getDecimals(address erc20) internal view returns (uint8) {
         return IERC20Metadata(erc20).decimals();
+    }
+
+    function _setFee(Fee memory _fee) internal {
+        if (
+            _fee.treasury == address(0) || 
+            _fee.depositFeeInBps > HUNDRED_PERCENT_IN_BPS || 
+            _fee.redeemFeeInBps > HUNDRED_PERCENT_IN_BPS
+        ) revert InvalidValue();
+        
+        emit FeeSet(fee, _fee);
+        fee = _fee;
     }
 
     function _verifyPositionLimits() internal view {

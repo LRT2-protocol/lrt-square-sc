@@ -32,6 +32,7 @@ contract DeployLRTSquare is Utils {
 
     uint128 percentageRateLimit = 10_000_000_000; // 1000%
     uint256 communityPauseDepositAmt = 4 ether;
+    LRTSquare.Fee fee;
 
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -50,6 +51,12 @@ contract DeployLRTSquare is Utils {
         swapRouter1InchV6 = config.swapRouter1InchV6;
 
         swapper = new Swapper1InchV6(swapRouter1InchV6);
+
+        fee = LRTSquare.Fee({
+            treasury: config.treasury,
+            depositFeeInBps: config.depositFeeInBps,
+            redeemFeeInBps: config.redeemFeeInBps
+        });
 
         tokens.push(ethfi); 
         tokens.push(eigen);
@@ -129,7 +136,8 @@ contract DeployLRTSquare is Utils {
             address(swapper),
             address(priceProvider),
             percentageRateLimit,
-            communityPauseDepositAmt
+            communityPauseDepositAmt,
+            fee
         );
         
         tokens.pop();
