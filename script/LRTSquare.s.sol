@@ -94,7 +94,7 @@ contract DeployLRTSquare is Utils {
                     priceProviderImpl, 
                     abi.encodeWithSelector(
                         PriceProvider.initialize.selector,
-                        deployer,
+                        owner,
                         tokens,
                         priceProviderConfig
                     )
@@ -130,7 +130,7 @@ contract DeployLRTSquare is Utils {
         }
 
         // lrtSquare.whitelistRebalacingOutputToken(WETH, true);
-        // lrtSquare.transferGovernance(owner);
+        lrtSquare.transferGovernance(owner);
 
         string memory parentObject = "parent object";
 
