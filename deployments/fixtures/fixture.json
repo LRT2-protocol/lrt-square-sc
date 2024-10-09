@@ -1,16 +1,16 @@
 {
     "1": {
-        "owner": "0x7D829d50aAF400B8B29B3b311F4aD70aD819DC6E",
-        "treasury": "0x7D829d50aAF400B8B29B3b311F4aD70aD819DC6E",
-        "rebalancer": "0x7D829d50aAF400B8B29B3b311F4aD70aD819DC6E",
-        "pauser": "0x7D829d50aAF400B8B29B3b311F4aD70aD819DC6E",
+        "owner": "0xF46D3734564ef9a5a16fC3B1216831a28f78e2B5",
+        "treasury": "0xF46D3734564ef9a5a16fC3B1216831a28f78e2B5",
+        "rebalancer": "0xF46D3734564ef9a5a16fC3B1216831a28f78e2B5",
+        "pauser": ["0x9af1298993dc1f397973c62a5d47a284cf76844d", "0xF46D3734564ef9a5a16fC3B1216831a28f78e2B5"],
         "swapRouter1InchV6": "0x111111125421cA6dc452d289314280a0f8842A65",
         "ethfi": "0xFe0c30065B384F05761f15d0CC899D4F9F9Cc0eB",
         "eigen": "0xec53bF9167f50cDEB3Ae105f56099aaaB9061F83",
-        "ethfiChainlinkOracle": "0xD10aBbC76679a20055E167BB80A24ac851b37056",
+        "ethfiChainlinkOracle": "",
         "eigenChainlinkOracle": "0xf2917e602C2dCa458937fad715bb1E465305A4A1",
         "ethUsdChainlinkOracle": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
-        "depositFeeInBps": "10", 
-        "redeemFeeInBps": "10"
+        "depositFeeInBps": "0", 
+        "redeemFeeInBps": "0"
     }
 }

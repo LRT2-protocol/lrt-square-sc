@@ -12,13 +12,13 @@ pragma solidity ^0.8.25;
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAggregationExecutor, IOneInchRouterV6, SwapDescription} from "./interfaces/IOneInch.sol";
 import {ISwapper} from "./interfaces/ISwapper.sol";
-import {console} from "forge-std/console.sol";
+import {ReentrancyGuardTransient} from "./utils/ReentrancyGuardTransient.sol";
 
 /**
  * @title Swapper1InchV6
  * @notice 1Inch Pathfinder V6 implementation of the general ISwapper interface.
  */
-contract Swapper1InchV6 is ISwapper {
+contract Swapper1InchV6 is ISwapper, ReentrancyGuardTransient {
     using SafeERC20 for IERC20;
 
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
@@ -47,7 +47,7 @@ contract Swapper1InchV6 is ISwapper {
         uint256 _fromAssetAmount,
         uint256 _minToAssetAmount,
         bytes calldata _data
-    ) external returns (uint256 toAssetAmount) {
+    ) external nonReentrant returns (uint256 toAssetAmount) {
         if (IERC20(_fromAsset).allowance(address(this), swapRouter) < _fromAssetAmount) 
             IERC20(_fromAsset).forceApprove(swapRouter, type(uint256).max);
 

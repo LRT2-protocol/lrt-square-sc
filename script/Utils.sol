@@ -8,10 +8,10 @@ struct ChainConfig {
     address owner;
     address treasury;
     address rebalancer;
-    address pauser;
+    address[] pauser;
     address ethfi;
     address eigen;
-    address ethfiChainlinkOracle;
+    // address ethfiChainlinkOracle;
     address eigenChainlinkOracle;
     address ethUsdChainlinkOracle;
     address swapRouter1InchV6;
@@ -35,81 +35,69 @@ contract Utils is Script {
 
         string memory inputJson = vm.readFile(string.concat(dir, file));
 
-        address owner = stdJson.readAddress(
+        ChainConfig memory config;
+
+        config.owner = stdJson.readAddress(
             inputJson,
             string.concat(".", chainId, ".", "owner")
         );
 
-        address treasury = stdJson.readAddress(
+        config.treasury = stdJson.readAddress(
             inputJson,
             string.concat(".", chainId, ".", "treasury")
         );
 
-        address rebalancer = stdJson.readAddress(
+        config.rebalancer = stdJson.readAddress(
             inputJson,
             string.concat(".", chainId, ".", "rebalancer")
         );
 
-        address pauser = stdJson.readAddress(
+        config.pauser = stdJson.readAddressArray(
             inputJson,
             string.concat(".", chainId, ".", "pauser")
         );
         
-        address ethfi = stdJson.readAddress(
+        config.ethfi = stdJson.readAddress(
             inputJson,
             string.concat(".", chainId, ".", "ethfi")
         );
         
-        address eigen = stdJson.readAddress(
+        config.eigen = stdJson.readAddress(
             inputJson,
             string.concat(".", chainId, ".", "eigen")
         );
         
-        address ethfiChainlinkOracle = stdJson.readAddress(
-            inputJson,
-            string.concat(".", chainId, ".", "ethfiChainlinkOracle")
-        );
+        // config.ethfiChainlinkOracle = stdJson.readAddress(
+        //     inputJson,
+        //     string.concat(".", chainId, ".", "ethfiChainlinkOracle")
+        // );
         
-        address eigenChainlinkOracle = stdJson.readAddress(
+        config.eigenChainlinkOracle = stdJson.readAddress(
             inputJson,
             string.concat(".", chainId, ".", "eigenChainlinkOracle")
         );
         
-        address ethUsdChainlinkOracle = stdJson.readAddress(
+        config.ethUsdChainlinkOracle = stdJson.readAddress(
             inputJson,
             string.concat(".", chainId, ".", "ethUsdChainlinkOracle")
         );
 
-        address swapRouter1InchV6 = stdJson.readAddress(
+        config.swapRouter1InchV6 = stdJson.readAddress(
             inputJson,
             string.concat(".", chainId, ".", "swapRouter1InchV6")
         );
 
-        uint48 depositFeeInBps = uint48(stdJson.readUint(
+        config.depositFeeInBps = uint48(stdJson.readUint(
             inputJson, 
             string.concat(".", chainId, ".", "depositFeeInBps")
         ));
 
-        uint48 redeemFeeInBps = uint48(stdJson.readUint(
+        config.redeemFeeInBps = uint48(stdJson.readUint(
             inputJson, 
             string.concat(".", chainId, ".", "redeemFeeInBps")
         ));
 
-        return
-            ChainConfig({
-                owner: owner,
-                treasury: treasury,
-                rebalancer: rebalancer,
-                pauser: pauser,
-                ethfi: ethfi,
-                eigen: eigen,
-                ethfiChainlinkOracle: ethfiChainlinkOracle,
-                eigenChainlinkOracle: eigenChainlinkOracle,
-                ethUsdChainlinkOracle: ethUsdChainlinkOracle,
-                swapRouter1InchV6: swapRouter1InchV6,
-                depositFeeInBps: depositFeeInBps,
-                redeemFeeInBps: redeemFeeInBps
-            });
+        return config;
     }
 
     function readDeploymentFile() internal view returns (string memory) {

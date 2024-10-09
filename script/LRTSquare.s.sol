@@ -21,7 +21,6 @@ contract DeployLRTSquare is Utils {
 
     address owner;
     address rebalancer;
-    address pauser;
     address swapRouter1InchV6;
     Swapper1InchV6 swapper;
 
@@ -34,6 +33,8 @@ contract DeployLRTSquare is Utils {
     uint256 communityPauseDepositAmt = 4 ether;
     LRTSquare.Fee fee;
 
+    address depositor = 0xF46D3734564ef9a5a16fC3B1216831a28f78e2B5;
+
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
@@ -45,7 +46,7 @@ contract DeployLRTSquare is Utils {
 
         owner = config.owner;
         rebalancer = config.rebalancer;
-        pauser = config.pauser;
+        address[] memory pauser = config.pauser;
         ethfi = config.ethfi;
         eigen = config.eigen;
         swapRouter1InchV6 = config.swapRouter1InchV6;
@@ -58,29 +59,15 @@ contract DeployLRTSquare is Utils {
             redeemFeeInBps: config.redeemFeeInBps
         });
 
-        tokens.push(ethfi); 
         tokens.push(eigen);
-        tokens.push(WETH);
         tokens.push(ETH);
 
         tokenPositionWeightLimits.push(HUNDRED_PERCENT_LIMIT);
         tokenPositionWeightLimits.push(HUNDRED_PERCENT_LIMIT);        
-        tokenPositionWeightLimits.push(HUNDRED_PERCENT_LIMIT);        
-        tokenPositionWeightLimits.push(HUNDRED_PERCENT_LIMIT);        
         
         PriceProvider.Config[] memory priceProviderConfig = new PriceProvider.Config[](tokens.length);
-        
-        priceProviderConfig[0] = PriceProvider.Config({
-            oracle: config.ethfiChainlinkOracle,
-            priceFunctionCalldata: hex"",
-            isChainlinkType: true,
-            oraclePriceDecimals: IAggregatorV3(config.ethfiChainlinkOracle).decimals(),
-            maxStaleness: 1 days,
-            dataType: PriceProvider.ReturnType.Int256,
-            isBaseTokenEth: false
-        });
        
-        priceProviderConfig[1] = PriceProvider.Config({
+        priceProviderConfig[0] = PriceProvider.Config({
             oracle: config.eigenChainlinkOracle,
             priceFunctionCalldata: hex"",
             isChainlinkType: true,
@@ -90,7 +77,7 @@ contract DeployLRTSquare is Utils {
             isBaseTokenEth: false
         });
        
-        priceProviderConfig[2] = PriceProvider.Config({
+        priceProviderConfig[1] = PriceProvider.Config({
             oracle: config.ethUsdChainlinkOracle,
             priceFunctionCalldata: hex"",
             isChainlinkType: true,
@@ -100,16 +87,6 @@ contract DeployLRTSquare is Utils {
             isBaseTokenEth: false
         });
        
-        priceProviderConfig[3] = PriceProvider.Config({
-            oracle: config.ethUsdChainlinkOracle,
-            priceFunctionCalldata: hex"",
-            isChainlinkType: true,
-            oraclePriceDecimals: IAggregatorV3(config.ethUsdChainlinkOracle).decimals(),
-            maxStaleness: 1 days,
-            dataType: PriceProvider.ReturnType.Int256,
-            isBaseTokenEth: false
-        });
-
         address priceProviderImpl = address(new PriceProvider());
         priceProvider = PriceProvider(
             address(
@@ -131,7 +108,7 @@ contract DeployLRTSquare is Utils {
             "LrtSquare",
             "LRT2",
             deployer,
-            pauser,
+            pauser[0],
             rebalancer, 
             address(swapper),
             address(priceProvider),
@@ -139,9 +116,12 @@ contract DeployLRTSquare is Utils {
             communityPauseDepositAmt,
             fee
         );
+
+        lrtSquare.setPauser(pauser[1], true);
         
         tokens.pop();
         tokenPositionWeightLimits.pop();
+
         for (uint256 i = 0; i < tokens.length; ) {
             lrtSquare.registerToken(tokens[i], tokenPositionWeightLimits[i]);
             unchecked {
@@ -149,8 +129,7 @@ contract DeployLRTSquare is Utils {
             }
         }
 
-        lrtSquare.whitelistRebalacingOutputToken(WETH, true);
-
+        // lrtSquare.whitelistRebalacingOutputToken(WETH, true);
         // lrtSquare.transferGovernance(owner);
 
         string memory parentObject = "parent object";
@@ -178,8 +157,13 @@ contract DeployLRTSquare is Utils {
         );
         vm.serializeAddress(
             deployedAddresses,
-            "pauser",
-            address(pauser)
+            "pauser0",
+            address(pauser[0])
+        );
+        vm.serializeAddress(
+            deployedAddresses,
+            "pauser1",
+            address(pauser[1])
         );
 
         string memory addressOutput = vm.serializeAddress(

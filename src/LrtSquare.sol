@@ -132,7 +132,6 @@ contract LRTSquare is
     error InsufficientTokensReceivedFromSwapper();
     error ApplicableSlippageGreaterThanMaxLimit();
     error AlreadyInSameState();
-
     
 
     /// @custom:oz-upgrades-unsafe-allow constructor
