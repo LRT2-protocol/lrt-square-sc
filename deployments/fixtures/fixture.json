@@ -11,6 +11,8 @@
         "eigenChainlinkOracle": "0xf2917e602C2dCa458937fad715bb1E465305A4A1",
         "ethUsdChainlinkOracle": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
         "depositFeeInBps": "0", 
-        "redeemFeeInBps": "0"
+        "redeemFeeInBps": "0",
+        "cumulativeDropOwner": "0xF46D3734564ef9a5a16fC3B1216831a28f78e2B5",
+        "cumulativeDropPauser": "0xF46D3734564ef9a5a16fC3B1216831a28f78e2B5"
     }
 }

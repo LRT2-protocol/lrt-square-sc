@@ -17,6 +17,8 @@ struct ChainConfig {
     address swapRouter1InchV6;
     uint48 depositFeeInBps;
     uint48 redeemFeeInBps;
+    address cumulativeDropOwner;
+    address cumulativeDropPauser;
 }
 
 contract Utils is Script {
@@ -95,6 +97,16 @@ contract Utils is Script {
         config.redeemFeeInBps = uint48(stdJson.readUint(
             inputJson, 
             string.concat(".", chainId, ".", "redeemFeeInBps")
+        ));
+
+        config.cumulativeDropOwner = address(stdJson.readAddress(
+            inputJson, 
+            string.concat(".", chainId, ".", "cumulativeDropOwner")
+        ));
+
+        config.cumulativeDropPauser = address(stdJson.readAddress(
+            inputJson, 
+            string.concat(".", chainId, ".", "cumulativeDropPauser")
         ));
 
         return config;
