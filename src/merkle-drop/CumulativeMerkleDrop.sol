@@ -50,10 +50,14 @@ contract CumulativeMerkleDrop is
     bytes32 public override merkleRoot;
     mapping(address => uint256) public cumulativeClaimed;
 
-    constructor(uint48 _accessControlDelay, address _owner, address _token, address _pauser) {
+    constructor(address _token) {
+        token = _token;
+        _disableInitializers();
+    }
+
+    function initialize(uint48 _accessControlDelay, address _owner, address _pauser) external initializer {
         __AccessControlDefaultAdminRules_init_unchained(_accessControlDelay, _owner);
         _grantRole(PAUSER_ROLE, _pauser);
-        token = _token;
     }
 
     function setMerkleRoot(bytes32 merkleRoot_) external onlyRole(DEFAULT_ADMIN_ROLE) {
