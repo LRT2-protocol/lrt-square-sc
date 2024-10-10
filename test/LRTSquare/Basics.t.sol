@@ -26,7 +26,9 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
         assertEq(lrtSquare.isTokenWhitelisted(address(tokens[2])), true);
 
         assertEq(lrtSquare.totalSupply(), 0);
-        assertEq(lrtSquare.totalAssetsValueInEth(), 0);
+        (uint256 tvl, uint256 tvlUsd) = lrtSquare.tvl();
+        assertEq(tvl, 0);
+        assertEq(tvlUsd, 0);
 
         vm.expectRevert(LRTSquare.TotalSupplyZero.selector);
         lrtSquare.assetsForVaultShares(1);
@@ -254,7 +256,10 @@ contract LRTSquareBasicsTest is LRTSquareTestSetup {
             _amounts
         );
 
-        assertEq(lrtSquare.totalAssetsValueInEth(), totalValueInEth);
+        (uint256 tvl, uint256 tvlUsd) = lrtSquare.tvl();
+        (uint256 ethUsdPrice, uint8 ethUsdDecimals) = priceProvider.getEthUsdPrice();
+        assertEq(tvl, totalValueInEth);
+        assertEq(tvlUsd, (totalValueInEth * ethUsdPrice) / 10 ** ethUsdDecimals);
     }
 
     function _deposit(

@@ -21,4 +21,8 @@ contract MockPriceProvider is IPriceProvider {
     function decimals() external pure returns (uint8) {
         return 18;
     }
+
+    function getEthUsdPrice() external pure returns (uint256, uint8) {
+        return (3000e8, 8);
+    }
 }

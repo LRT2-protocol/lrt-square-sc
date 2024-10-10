@@ -20,6 +20,9 @@ interface IPriceProvider {
     /// @notice Get the decimals of the price provider (6 decimals)
     function decimals() external pure returns (uint8);
 
+    /// @notice Get the price of ETH in USD
+    function getEthUsdPrice() external view returns (uint256, uint8);
+    
     /// @notice Set the price of the token in ETH (18 decimals)
     function setPrice(address token, uint256 price) external;
 }

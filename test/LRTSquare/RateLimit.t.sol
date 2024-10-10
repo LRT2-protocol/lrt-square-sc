@@ -58,8 +58,9 @@ contract LRTSquareRateLimitTest is LRTSquareTestSetup {
         lrtSquare.deposit(assets, amounts, merkleDistributor);
         // 10 ether LRT^2 == {tokens[0]: 100 ether}
 
+        (uint256 tvl, ) = lrtSquare.tvl();
         assertApproxEqAbs(
-            lrtSquare.totalAssetsValueInEth(),
+            tvl,
             (amounts[0] * tokenPrices[0]) / 1 ether,
             1
         );

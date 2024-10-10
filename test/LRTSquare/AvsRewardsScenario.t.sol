@@ -21,7 +21,8 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
     }
 
     function test_avs_rewards_scenario_1() public {
-        assertApproxEqAbs(lrtSquare.totalAssetsValueInEth(), 0, 0);
+        (uint256 tvl, uint256 tvlUsd) = lrtSquare.tvl();
+        assertApproxEqAbs(tvl, 0, 0);
 
         // 1. At week-0, ether.fi receives an AVS reward 'tokens[0]'
         // Assume that only alice was holding 1 weETH
@@ -32,6 +33,7 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
         // - ether.fi sends the 'tokens[0]' rewards 100 ether to the LrtSquare vault
         // - ether.fi mints LRT^2 tokens 10 ether to MerkleDistributor. MerkleDistributor will distribute the LrtSquare to Alice
 
+        (uint256 ethUsdPrice, uint8 ethUsdDecimals) = priceProvider.getEthUsdPrice();
         vm.prank(address(timelock));
         tokens[0].mint(owner, 100 ether);
 
@@ -53,9 +55,15 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
             lrtSquare.deposit(assets, amounts, merkleDistributor);
             // 10 ether LRT^2 == {tokens[0]: 100 ether}
 
+            (tvl, tvlUsd) = lrtSquare.tvl();
             assertApproxEqAbs(
-                lrtSquare.totalAssetsValueInEth(),
+                tvl,
                 (amounts[0] * tokenPrices[0]) / 1 ether,
+                1
+            );
+            assertApproxEqAbs(
+                tvlUsd,
+                (((amounts[0] * tokenPrices[0]) / 1 ether) * ethUsdPrice) / 10 ** ethUsdDecimals,
                 1
             );
             assertEq(
@@ -88,9 +96,15 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
             // (10 + 20) ether LRT^2 == {tokens[0]: 100 + 200 ether}
             // --> 1 ether LRT^2 == {tokens[0]: 10 ether}
 
+            (tvl, tvlUsd) = lrtSquare.tvl();
             assertApproxEqAbs(
-                lrtSquare.totalAssetsValueInEth(),
+                tvl,
                 (100 + 200) * tokenPrices[0],
+                1
+            );
+            assertApproxEqAbs(
+                tvlUsd,
+                ((100 + 200) * tokenPrices[0] * ethUsdPrice) / 10 ** ethUsdDecimals,
                 1
             );
 
@@ -129,10 +143,15 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
             lrtSquare.deposit(assets, amounts, merkleDistributor);
             // (10 + 20 + 10) ether LRT^2 == {tokens[0]: 100 + 200 + 100 ether}
             // --> 1 ether LRT^2 == {tokens[0]: 10 ether}
-
+            (tvl, tvlUsd) = lrtSquare.tvl();
             assertApproxEqAbs(
-                lrtSquare.totalAssetsValueInEth(),
+                tvl,
                 (100 + 200 + 100) * tokenPrices[0],
+                1
+            );
+            assertApproxEqAbs(
+                tvlUsd,
+                ((100 + 200 + 100) * tokenPrices[0] * ethUsdPrice) / 10 ** ethUsdDecimals,
                 1
             );
 
@@ -183,9 +202,16 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
                 1
             ); // 100 * 0.1 ether + 10 * 0.5 ether = 15 ether worth
             lrtSquare.deposit(assets, amounts, merkleDistributor);
+
+            (tvl, tvlUsd) = lrtSquare.tvl();
             assertApproxEqAbs(
-                lrtSquare.totalAssetsValueInEth(),
+                tvl,
                 (100 + 200 + 100 + 100) * tokenPrices[0] + 10 * tokenPrices[1],
+                1
+            );
+            assertApproxEqAbs(
+                tvlUsd,
+                (((100 + 200 + 100 + 100) * tokenPrices[0] + 10 * tokenPrices[1]) * ethUsdPrice) / 10 ** ethUsdDecimals,
                 1
             );
             vm.stopPrank();

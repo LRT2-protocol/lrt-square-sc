@@ -471,7 +471,7 @@ contract LRTSquare is
         return (assets, assetAmounts);
     }
 
-    function totalAssetsValueInEth() external view returns (uint256) {
+    function tvl() external view returns (uint256, uint256) {
         (
             address[] memory assets,
             uint256[] memory assetAmounts
@@ -484,7 +484,10 @@ contract LRTSquare is
                     10 ** _getDecimals(assets[i]);
         }
 
-        return totalValue;
+        (uint256 ethUsdPrice, uint8 ethUsdDecimals) = IPriceProvider(priceProvider).getEthUsdPrice();
+        uint256 totalValueInUsd = totalValue * ethUsdPrice / 10 ** ethUsdDecimals;
+
+        return (totalValue, totalValueInUsd);
     }
 
     function isTokenRegistered(address token) public view returns (bool) {
