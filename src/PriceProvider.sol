@@ -4,7 +4,7 @@ pragma solidity ^0.8.25;
 import {IPriceProvider} from "./interfaces/IPriceProvider.sol";
 import {Governable} from "./governance/Governable.sol";
 import {IAggregatorV3} from "./interfaces/IAggregatorV3.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 contract PriceProvider is IPriceProvider, Governable, Initializable, UUPSUpgradeable {

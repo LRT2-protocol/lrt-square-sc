@@ -24,26 +24,39 @@
 
 pragma solidity ^0.8.24;
 
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessControlDefaultAdminRulesUpgradeable} from "openzeppelin-contracts-upgradeable/contracts/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
+import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import { SafeERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ICumulativeMerkleDrop } from "../interfaces/ICumulativeMerkleDrop.sol";
+import {ReentrancyGuardTransient} from "../utils/ReentrancyGuardTransient.sol";
 
 // Taken from https://github.com/1inch/merkle-distribution/blob/master/contracts/CumulativeMerkleDrop.sol
-contract CumulativeMerkleDrop is Ownable, ICumulativeMerkleDrop {
+contract CumulativeMerkleDrop is  
+    ICumulativeMerkleDrop, 
+    Initializable,
+    UUPSUpgradeable,
+    AccessControlDefaultAdminRulesUpgradeable, 
+    PausableUpgradeable, 
+    ReentrancyGuardTransient
+{
     using SafeERC20 for IERC20;
     // using MerkleProof for bytes32[];
 
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     // solhint-disable-next-line immutable-vars-naming
     address public immutable override token;
 
     bytes32 public override merkleRoot;
     mapping(address => uint256) public cumulativeClaimed;
 
-    constructor(address token_) Ownable(msg.sender) {
-        token = token_;
+    constructor(uint48 _accessControlDelay, address _owner, address _token, address _pauser) {
+        __AccessControlDefaultAdminRules_init_unchained(_accessControlDelay, _owner);
+        _grantRole(PAUSER_ROLE, _pauser);
+        token = _token;
     }
 
-    function setMerkleRoot(bytes32 merkleRoot_) external override onlyOwner {
+    function setMerkleRoot(bytes32 merkleRoot_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         emit MerkelRootUpdated(merkleRoot, merkleRoot_);
         merkleRoot = merkleRoot_;
     }
@@ -53,12 +66,11 @@ contract CumulativeMerkleDrop is Ownable, ICumulativeMerkleDrop {
         uint256 cumulativeAmount,
         bytes32 expectedMerkleRoot,
         bytes32[] calldata merkleProof
-    ) external override {
+    ) external whenNotPaused nonReentrant {
         if (merkleRoot != expectedMerkleRoot) revert MerkleRootWasUpdated();
 
         // Verify the merkle proof
-        bytes32 leaf = keccak256(abi.encodePacked(account, cumulativeAmount));
-        if (!_verifyAsm(merkleProof, expectedMerkleRoot, leaf)) revert InvalidProof();
+        if (!verify(account, cumulativeAmount, expectedMerkleRoot, merkleProof)) revert InvalidProof();
 
         // Mark it claimed
         uint256 preclaimed = cumulativeClaimed[account];
@@ -73,9 +85,23 @@ contract CumulativeMerkleDrop is Ownable, ICumulativeMerkleDrop {
         }
     }
 
-    // function verify(bytes32[] calldata merkleProof, bytes32 root, bytes32 leaf) public pure returns (bool) {
-    //     return merkleProof.verify(root, leaf);
-    // }
+    function verify(
+        address account, 
+        uint256 cumulativeAmount, 
+        bytes32 expectedMerkleRoot, 
+        bytes32[] calldata merkleProof
+    ) public pure returns (bool) {
+        bytes32 leaf = keccak256(abi.encodePacked(account, cumulativeAmount));
+        return _verifyAsm(merkleProof, expectedMerkleRoot, leaf);
+    }
+
+    function pause() external whenNotPaused onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    function unpause() external whenPaused onlyRole(PAUSER_ROLE) {
+        _unpause();
+    }
 
     function _verifyAsm(bytes32[] calldata proof, bytes32 root, bytes32 leaf) private pure returns (bool valid) {
         /// @solidity memory-safe-assembly
@@ -101,4 +127,6 @@ contract CumulativeMerkleDrop is Ownable, ICumulativeMerkleDrop {
             valid := eq(root, leaf)
         }
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }
