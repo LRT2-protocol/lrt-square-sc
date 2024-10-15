@@ -8,19 +8,19 @@ import {Utils} from "./Utils.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 contract RegisterNewToken is Utils {
-    address token = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address token = 0xFe0c30065B384F05761f15d0CC899D4F9F9Cc0eB;
     PriceProvider.Config config = PriceProvider.Config({
-        oracle: 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6,
+        oracle: 0x19678515847d8DE85034dAD0390e09c3048d31cd,
         priceFunctionCalldata: hex"",
         isChainlinkType: true, 
         oraclePriceDecimals: 8,
-        maxStaleness: 10 days,
+        maxStaleness: 2 days,
         dataType: PriceProvider.ReturnType.Int256,
         isBaseTokenEth: false
     });
     
-    PriceProvider priceProvider;
-    LRTSquare lrtSquare;
+    PriceProvider priceProvider = PriceProvider(0x2B90103cdc9Bba6c0dBCAaF961F0B5b1920F19E3);
+    LRTSquare lrtSquare = LRTSquare(0x8F08B70456eb22f6109F57b8fafE862ED28E6040);
 
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -31,17 +31,6 @@ contract RegisterNewToken is Utils {
         tokens[0] = token;
         PriceProvider.Config[] memory configs = new PriceProvider.Config[](1);
         configs[0] = config;
-
-        string memory deployments = readDeploymentFile();
-        lrtSquare = LRTSquare(stdJson.readAddress(
-            deployments,
-            string.concat(".", "addresses", ".", "lrtSquareProxy")
-        ));
-
-        priceProvider = PriceProvider(stdJson.readAddress(
-            deployments,
-            string.concat(".", "addresses", ".", "priceProviderProxy")
-        ));
 
         priceProvider.setTokenConfig(tokens, configs);
         lrtSquare.registerToken(token, HUNDRED_PERCENT_LIMIT);
