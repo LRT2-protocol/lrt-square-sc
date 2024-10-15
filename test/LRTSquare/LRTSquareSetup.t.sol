@@ -377,7 +377,7 @@ contract LRTSquareTestSetup is Utils {
         uint256 valueInEth
     ) internal view returns (uint256) {
         uint256 _totalSupply = lrtSquare.totalSupply();
-        uint256 _vaultTokenValuesInEth = lrtSquare.getVaultTokenValuesInEth(
+        (uint256 _vaultTokenValuesInEth, ) = lrtSquare.fairValueOf(
             _totalSupply
         );
 

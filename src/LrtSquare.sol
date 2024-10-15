@@ -230,12 +230,12 @@ contract LRTSquare is
         if (!isTokenWhitelisted(_toAsset)) revert TokenNotWhitelisted();
         if (!isWhitelistedRebalanceOutputToken[_toAsset]) revert NotAValidRebalanceOutputToken();
 
-        uint256 vaultTotalValueBefore = getVaultTokenValuesInEth(totalSupply());
+        uint256 vaultTotalValueBefore = _getVaultTokenValuesInEth(totalSupply());
         uint256 toAssetAmountBefore = IERC20(_toAsset).balanceOf(address(this));
         IERC20(_fromAsset).safeTransfer(swapper, _fromAssetAmount);
         uint256 outAmount = ISwapper(swapper).swap(_fromAsset, _toAsset, _fromAssetAmount, _minToAssetAmount, _data);
 
-        uint256 vaultTotalValueAfter = getVaultTokenValuesInEth(totalSupply());
+        uint256 vaultTotalValueAfter = _getVaultTokenValuesInEth(totalSupply());
         uint256 toAssetAmountAfter = IERC20(_toAsset).balanceOf(address(this));
 
         if (toAssetAmountAfter - toAssetAmountBefore < _minToAssetAmount) revert InsufficientTokensReceivedFromSwapper();
@@ -359,7 +359,7 @@ contract LRTSquare is
         if (_receiver == address(0)) revert InvalidRecipient();
 
         bool initialDeposit = (totalSupply() == 0);
-        uint256 vaultTokenValueBefore = getVaultTokenValuesInEth(
+        uint256 vaultTokenValueBefore = _getVaultTokenValuesInEth(
             1 * 10 ** decimals()
         );
 
@@ -373,7 +373,7 @@ contract LRTSquare is
 
         _verifyPositionLimits();
 
-        uint256 vaultTokenValueAfter = getVaultTokenValuesInEth(
+        uint256 vaultTokenValueAfter = _getVaultTokenValuesInEth(
             1 * 10 ** decimals()
         );
 
@@ -534,21 +534,13 @@ contract LRTSquare is
         return (IERC20(token).balanceOf(address(this)) * IPriceProvider(priceProvider).getPriceInEth(token)) / 10 ** _getDecimals(token);
     }
 
-    function getVaultTokenValuesInEth(
-        uint256 vaultTokenShares
-    ) public view returns (uint256) {
-        uint256 totalSupply = totalSupply();
-        if (totalSupply == 0) return 0;
+    function fairValueOf(uint256 vaultTokenShares) external view returns (uint256, uint256) {
+        uint256 valueInEth = _getVaultTokenValuesInEth(vaultTokenShares);
+        (uint256 ethUsdPrice, uint8 ethUsdPriceDecimals) = IPriceProvider(priceProvider).getEthUsdPrice();
+        if (ethUsdPrice == 0) revert PriceProviderFailed();
+        uint256 valueInUsd = valueInEth * ethUsdPrice / 10 **  ethUsdPriceDecimals;
 
-        // 152981376626067400
-
-        (
-            address[] memory assets,
-            uint256[] memory assetAmounts
-        ) = totalAssets();
-
-        uint256 totalValue = getTokenValuesInEth(assets, assetAmounts);
-        return (totalValue * vaultTokenShares) / totalSupply;
+        return (valueInEth, valueInUsd);
     }
 
     function communityPause() external payable whenNotPaused {
@@ -594,7 +586,7 @@ contract LRTSquare is
     function positionWeightLimit() public view returns (address[] memory, uint64[] memory) {
         uint256 len = tokens.length;
         uint64[] memory positionWeightLimits = new uint64[](len);
-        uint256 vaultTotalValue = getVaultTokenValuesInEth(totalSupply());
+        uint256 vaultTotalValue = _getVaultTokenValuesInEth(totalSupply());
 
         for (uint256 i = 0; i < len; ) {
             positionWeightLimits[i] = _getPositionWeight(tokens[i], vaultTotalValue);
@@ -608,7 +600,7 @@ contract LRTSquare is
 
     function getPositionWeight(address token) public view returns (uint64) {
         if (!isTokenRegistered(token)) revert TokenNotRegistered();
-        uint256 vaultTotalValue = getVaultTokenValuesInEth(totalSupply());
+        uint256 vaultTotalValue = _getVaultTokenValuesInEth(totalSupply());
         return _getPositionWeight(token, vaultTotalValue);
     }
 
@@ -651,7 +643,7 @@ contract LRTSquare is
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) return valueInEth;
 
-        return valueInEth.mulDiv(_totalSupply, getVaultTokenValuesInEth(_totalSupply), rounding);
+        return valueInEth.mulDiv(_totalSupply, _getVaultTokenValuesInEth(_totalSupply), rounding);
     }
 
     function _convertToAssetAmount(
@@ -685,7 +677,7 @@ contract LRTSquare is
 
     function _verifyPositionLimits() internal view {
         uint256 len = tokens.length;
-        uint256 vaultTotalValue = getVaultTokenValuesInEth(totalSupply());
+        uint256 vaultTotalValue = _getVaultTokenValuesInEth(totalSupply());
 
         if(vaultTotalValue == 0) return;
 
@@ -697,6 +689,21 @@ contract LRTSquare is
                 ++i;
             }
         }
+    }
+
+    function _getVaultTokenValuesInEth(
+        uint256 vaultTokenShares
+    ) internal view returns (uint256) {
+        uint256 totalSupply = totalSupply();
+        if (totalSupply == 0) return 0;
+
+        (
+            address[] memory assets,
+            uint256[] memory assetAmounts
+        ) = totalAssets();
+
+        uint256 totalValue = getTokenValuesInEth(assets, assetAmounts);
+        return (totalValue * vaultTokenShares) / totalSupply;
     }
 
     function _withdrawEth(address recipient, uint256 amount) internal {
