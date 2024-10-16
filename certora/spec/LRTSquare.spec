@@ -43,3 +43,17 @@ rule CannotDepositWhenPaused (env e, address[] tokens, uint256[] amounts, addres
 
     assert isReverted == true;
 }
+
+// Verified
+rule CanRedeemWhenPaused (env e, uint256 vaultShares) {
+    bool isPaused = currentContract.paused();
+    require isPaused == true;
+    require vaultShares != 0;
+    require currentContract.fee.treasury != e.msg.sender;
+
+    uint256 balBefore = currentContract.balanceOf(e.msg.sender);
+    redeem(e, vaultShares);
+    uint256 balAfter = currentContract.balanceOf(e.msg.sender);
+
+    assert balBefore - balAfter == vaultShares; 
+}
