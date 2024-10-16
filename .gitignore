@@ -14,6 +14,9 @@ docs/
 # Coverage
 report
 
+# Certora
+.certora_internal
+
 # Dotenv file
 .env
 
