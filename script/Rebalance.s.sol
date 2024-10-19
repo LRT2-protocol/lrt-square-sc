@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquare, Governable} from "../src/LRTSquare.sol";
+import {LRTSquared, Governable} from "../src/LRTSquared.sol";
 import {Utils, ChainConfig} from "./Utils.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
-contract RebalanceLRTSquare is Utils {
+contract RebalanceLRTSquared is Utils {
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
         vm.startBroadcast(deployerPrivateKey);
 
         string memory deployments = readDeploymentFile();
-        LRTSquare lrtSquare = LRTSquare(stdJson.readAddress(
+        LRTSquared lrtSquared = LRTSquared(stdJson.readAddress(
             deployments,
-            string.concat(".", "addresses", ".", "lrtSquareProxy")
+            string.concat(".", "addresses", ".", "lrtSquaredProxy")
         ));
 
         address swapper = stdJson.readAddress(
@@ -26,13 +26,13 @@ contract RebalanceLRTSquare is Utils {
         bytes memory quote = getQuoteOneInch(
             vm.toString(block.chainid),
             swapper,
-            address(lrtSquare),
+            address(lrtSquared),
             config.eigen,
             WETH,
             1e18
         );
 
-        lrtSquare.rebalance(
+        lrtSquared.rebalance(
             config.eigen,
             WETH,
             1e18,

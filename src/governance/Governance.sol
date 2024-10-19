@@ -13,7 +13,7 @@ import {TimelockController} from "@openzeppelin/contracts/governance/TimelockCon
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 
-contract LRTSquareGovernor is
+contract LRTSquaredGovernor is
     Governor,
     GovernorSettings,
     GovernorCountingSimple,

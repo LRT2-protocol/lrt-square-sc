@@ -2,18 +2,18 @@
 pragma solidity ^0.8.25;
 
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {LRTSquare, Governable} from "../src/LRTSquare.sol";
+import {LRTSquared, Governable} from "../src/LRTSquared.sol";
 import {UUPSProxy} from "../src/UUPSProxy.sol";
 import {PriceProvider} from "../src/PriceProvider.sol";
 import {Utils, ChainConfig} from "./Utils.sol";
 import {Swapper1InchV6} from "../src/Swapper1InchV6.sol";
 import {IAggregatorV3} from "../src/interfaces/IAggregatorV3.sol";
 
-contract DeployLRTSquare is Utils {
+contract DeployLRTSquared is Utils {
     using SafeERC20 for IERC20;
     
     string chainId;
-    LRTSquare public lrtSquare;
+    LRTSquared public lrtSquared;
 
     address[] public tokens;
     PriceProvider public priceProvider;
@@ -30,7 +30,7 @@ contract DeployLRTSquare is Utils {
 
     uint128 percentageRateLimit = 10_000_000_000; // 1000%
     uint256 communityPauseDepositAmt = 4 ether;
-    LRTSquare.Fee fee;
+    LRTSquared.Fee fee;
 
     address depositor = 0xF46D3734564ef9a5a16fC3B1216831a28f78e2B5;
 
@@ -52,7 +52,7 @@ contract DeployLRTSquare is Utils {
 
         swapper = new Swapper1InchV6(swapRouter1InchV6);
 
-        fee = LRTSquare.Fee({
+        fee = LRTSquared.Fee({
             treasury: config.treasury,
             depositFeeInBps: config.depositFeeInBps,
             redeemFeeInBps: config.redeemFeeInBps
@@ -101,10 +101,10 @@ contract DeployLRTSquare is Utils {
             )
         );
 
-        address lrtSquareImpl = address(new LRTSquare());
-        lrtSquare = LRTSquare(address(new UUPSProxy(lrtSquareImpl, "")));
-        lrtSquare.initialize(
-            "LrtSquare",
+        address lrtSquaredImpl = address(new LRTSquared());
+        lrtSquared = LRTSquared(address(new UUPSProxy(lrtSquaredImpl, "")));
+        lrtSquared.initialize(
+            "LRTSquared",
             "LRT2",
             deployer,
             pauser[0],
@@ -116,27 +116,27 @@ contract DeployLRTSquare is Utils {
             fee
         );
 
-        lrtSquare.setPauser(pauser[1], true);
+        lrtSquared.setPauser(pauser[1], true);
         
         tokens.pop();
         tokenPositionWeightLimits.pop();
 
         for (uint256 i = 0; i < tokens.length; ) {
-            lrtSquare.registerToken(tokens[i], tokenPositionWeightLimits[i]);
+            lrtSquared.registerToken(tokens[i], tokenPositionWeightLimits[i]);
             unchecked {
                 ++i;
             }
         }
 
-        // lrtSquare.whitelistRebalacingOutputToken(WETH, true);
-        lrtSquare.transferGovernance(owner);
+        // lrtSquared.whitelistRebalacingOutputToken(WETH, true);
+        lrtSquared.transferGovernance(owner);
 
         string memory parentObject = "parent object";
 
         string memory deployedAddresses = "addresses";
 
-        vm.serializeAddress(deployedAddresses, "lrtSquareProxt", address(lrtSquare));
-        vm.serializeAddress(deployedAddresses, "lrtSquareImpl", lrtSquareImpl);
+        vm.serializeAddress(deployedAddresses, "lrtSquaredProxy", address(lrtSquared));
+        vm.serializeAddress(deployedAddresses, "lrtSquaredImpl", lrtSquaredImpl);
         vm.serializeAddress(deployedAddresses, "priceProvider", address(priceProvider));
         vm.serializeAddress(
             deployedAddresses,
