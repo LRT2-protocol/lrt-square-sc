@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredTestSetup, LRTSquared, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
+import {LRTSquaredTestSetup, ILRTSquared, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Governable} from "../../src/governance/Governable.sol";
 
@@ -11,19 +11,15 @@ contract LRTSquaredFeeTest is LRTSquaredTestSetup {
         uint48 depositFee = 1;
         uint48 redeemFee = 2;
 
-        LRTSquared.Fee memory fee = LRTSquared.Fee(treasuryAddr, depositFee, redeemFee);
+        ILRTSquared.Fee memory fee = ILRTSquared.Fee(treasuryAddr, depositFee, redeemFee);
         vm.prank(address(timelock));
         lrtSquared.setFee(fee);
 
-        (
-            address treasuryAddrFromContract, 
-            uint48 depositFeeFromContract, 
-            uint48 redeemFeeFromContract
-        ) = lrtSquared.fee();
+        ILRTSquared.Fee memory feeFromContract = lrtSquared.fee();
 
-        assertEq(treasuryAddr, treasuryAddrFromContract);
-        assertEq(depositFee, depositFeeFromContract);
-        assertEq(redeemFee, redeemFeeFromContract);
+        assertEq(treasuryAddr, feeFromContract.treasury);
+        assertEq(depositFee, feeFromContract.depositFeeInBps);
+        assertEq(redeemFee, feeFromContract.redeemFeeInBps);
     }
 
     function test_OnlyGovernorCanSetFee() public {
@@ -31,7 +27,7 @@ contract LRTSquaredFeeTest is LRTSquaredTestSetup {
         uint48 depositFee = 1;
         uint48 redeemFee = 2;
 
-        LRTSquared.Fee memory fee = LRTSquared.Fee(treasuryAddr, depositFee, redeemFee);
+        ILRTSquared.Fee memory fee = ILRTSquared.Fee(treasuryAddr, depositFee, redeemFee);
         vm.prank(alice);
         vm.expectRevert(Governable.OnlyGovernor.selector);
         lrtSquared.setFee(fee);
@@ -42,9 +38,9 @@ contract LRTSquaredFeeTest is LRTSquaredTestSetup {
         uint48 depositFee = HUNDRED_PERCENT_IN_BPS + 1;
         uint48 redeemFee = 2;
 
-        LRTSquared.Fee memory fee = LRTSquared.Fee(treasuryAddr, depositFee, redeemFee);
+        ILRTSquared.Fee memory fee = ILRTSquared.Fee(treasuryAddr, depositFee, redeemFee);
         vm.prank(address(timelock));
-        vm.expectRevert(LRTSquared.InvalidValue.selector);
+        vm.expectRevert(ILRTSquared.InvalidValue.selector);
         lrtSquared.setFee(fee);
     }
 
@@ -53,9 +49,9 @@ contract LRTSquaredFeeTest is LRTSquaredTestSetup {
         uint48 depositFee = 1;
         uint48 redeemFee = HUNDRED_PERCENT_IN_BPS + 1;
 
-        LRTSquared.Fee memory fee = LRTSquared.Fee(treasuryAddr, depositFee, redeemFee);
+        ILRTSquared.Fee memory fee = ILRTSquared.Fee(treasuryAddr, depositFee, redeemFee);
         vm.prank(address(timelock));
-        vm.expectRevert(LRTSquared.InvalidValue.selector);
+        vm.expectRevert(ILRTSquared.InvalidValue.selector);
         lrtSquared.setFee(fee);
     }
     
@@ -64,13 +60,13 @@ contract LRTSquaredFeeTest is LRTSquaredTestSetup {
         uint48 depositFee = 1;
         uint48 redeemFee = 2;
 
-        LRTSquared.Fee memory fee = LRTSquared.Fee(treasuryAddr, depositFee, redeemFee);
+        ILRTSquared.Fee memory fee = ILRTSquared.Fee(treasuryAddr, depositFee, redeemFee);
         vm.prank(address(timelock));
-        vm.expectRevert(LRTSquared.InvalidValue.selector);
+        vm.expectRevert(ILRTSquared.InvalidValue.selector);
         lrtSquared.setFee(fee);
 
         vm.prank(address(timelock));
-        vm.expectRevert(LRTSquared.InvalidValue.selector);
+        vm.expectRevert(ILRTSquared.InvalidValue.selector);
         lrtSquared.setTreasuryAddress(treasuryAddr);
     }
 
@@ -79,8 +75,7 @@ contract LRTSquaredFeeTest is LRTSquaredTestSetup {
         vm.prank(address(timelock));
         lrtSquared.setTreasuryAddress(treasuryAddr);
 
-        (address treasuryAddrFromContract, , ) = lrtSquared.fee();
-
+        address treasuryAddrFromContract = lrtSquared.fee().treasury;
         assertEq(treasuryAddrFromContract, treasuryAddr);
     }
 }

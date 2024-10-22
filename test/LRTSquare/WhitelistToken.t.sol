@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredTestSetup, LRTSquared} from "./LRTSquaredSetup.t.sol";
+import {LRTSquaredTestSetup, ILRTSquared} from "./LRTSquaredSetup.t.sol";
 
 contract LRTSquaredWhitelistTokenTest is LRTSquaredTestSetup {
     function setUp() public override {
@@ -20,7 +20,7 @@ contract LRTSquaredWhitelistTokenTest is LRTSquaredTestSetup {
         _updateWhitelist(
             address(0),
             false,
-            abi.encodeWithSelector(LRTSquared.InvalidValue.selector)
+            abi.encodeWithSelector(ILRTSquared.InvalidValue.selector)
         );
     }
 
@@ -28,7 +28,7 @@ contract LRTSquaredWhitelistTokenTest is LRTSquaredTestSetup {
         _updateWhitelist(
             address(tokens[1]),
             true,
-            abi.encodeWithSelector(LRTSquared.TokenNotRegistered.selector)
+            abi.encodeWithSelector(ILRTSquared.TokenNotRegistered.selector)
         );
     }
 }

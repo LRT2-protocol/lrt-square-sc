@@ -4,7 +4,11 @@ pragma solidity ^0.8.25;
 import {Utils} from "../Utils.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
-import {LRTSquared, Governable} from "../../src/LRTSquared.sol";
+import {ILRTSquared} from "../../src/interfaces/ILRTSquared.sol";
+import {LRTSquaredStorage, Governable} from "../../src/LRTSquared/LRTSquaredStorage.sol";
+import {LRTSquaredAdmin} from "../../src/LRTSquared/LRTSquaredAdmin.sol";
+import {LRTSquaredInitializer} from "../../src/LRTSquared/LRTSquaredInitializer.sol";
+import {LRTSquaredCore} from "../../src/LRTSquared/LRTSquaredCore.sol";
 import {UUPSProxy} from "src/UUPSProxy.sol";
 import {MockPriceProvider} from "../../src/mocks/MockPriceProvider.sol";
 import {GovernanceToken} from "../../src/governance/GovernanceToken.sol";
@@ -32,7 +36,7 @@ contract LRTSquaredTestSetup is Utils {
 
     address pauser = makeAddr("pauser");
     address treasury = makeAddr("treasury");
-    LRTSquared public lrtSquared;
+    ILRTSquared public lrtSquared;
 
     MockERC20[] public tokens;
     IPriceProvider public priceProvider;
@@ -100,18 +104,21 @@ contract LRTSquaredTestSetup is Utils {
         tokens[1].mint(owner, 100 ether);
         tokens[2].mint(owner, 100 ether);
 
-        LRTSquared.Fee memory fee = LRTSquared.Fee({
+        LRTSquaredStorage.Fee memory fee = LRTSquaredStorage.Fee({
             treasury: treasury,
             depositFeeInBps: depositFeeInBps,
             redeemFeeInBps: redeemFeeInBps
         });
 
-        lrtSquared = LRTSquared(
-            address(new UUPSProxy(address(new LRTSquared()), ""))
-        );
-        lrtSquared.initialize(
-            "LrtSquared",
-            "LRT",
+        address lrtSquaredCoreImpl = address(new LRTSquaredCore());
+        address lrtSquaredAdminImpl = address(new LRTSquaredAdmin());
+        address lrtSquaredInitializer = address(new LRTSquaredInitializer());
+        address lrtSquaredProxy = address(new UUPSProxy(lrtSquaredInitializer, ""));
+        lrtSquared = ILRTSquared(lrtSquaredProxy);
+
+        LRTSquaredInitializer(address(lrtSquared)).initialize(
+            "LRTSquared",
+            "LRT2",
             address(timelock),
             pauser,
             rebalancer, 
@@ -123,8 +130,11 @@ contract LRTSquaredTestSetup is Utils {
         );
         vm.stopPrank();
 
-        vm.prank(address(timelock));
+        vm.startPrank(address(timelock));
+        LRTSquaredCore(address(lrtSquared)).upgradeToAndCall(lrtSquaredCoreImpl, "");
+        LRTSquaredCore(address(lrtSquared)).setAdminImpl(lrtSquaredAdminImpl);
         lrtSquared.updatePriceProvider(address(priceProvider));
+        vm.stopPrank();
     }
 
     function _registerToken(address token, uint256 tokenMaxPercentage, bytes memory revertData) internal {
@@ -138,7 +148,7 @@ contract LRTSquaredTestSetup is Utils {
         );
 
         bytes memory data = abi.encodeWithSelector(
-            LRTSquared.registerToken.selector,
+            ILRTSquared.registerToken.selector,
             token,
             tokenMaxPercentage
         );
@@ -162,7 +172,7 @@ contract LRTSquaredTestSetup is Utils {
             )
         );
         bytes memory data = abi.encodeWithSelector(
-            LRTSquared.updateWhitelist.selector,
+            ILRTSquared.updateWhitelist.selector,
             token,
             whitelist
         );
@@ -183,7 +193,7 @@ contract LRTSquaredTestSetup is Utils {
             )
         );
         bytes memory data = abi.encodeWithSelector(
-            LRTSquared.updatePriceProvider.selector,
+            ILRTSquared.updatePriceProvider.selector,
             _priceProvider
         );
 
@@ -198,7 +208,7 @@ contract LRTSquaredTestSetup is Utils {
         string memory description = "Proposal: Set depositors";
 
         bytes memory data = abi.encodeWithSelector(
-            LRTSquared.setDepositors.selector,
+            ILRTSquared.setDepositors.selector,
             depositors,
             isDepositor
         );
@@ -219,7 +229,7 @@ contract LRTSquaredTestSetup is Utils {
         );
 
         bytes memory data = abi.encodeWithSelector(
-            LRTSquared.updateTokenPositionWeightLimit.selector,
+            ILRTSquared.updateTokenPositionWeightLimit.selector,
             token,
             maxPercentage
         );
@@ -234,7 +244,7 @@ contract LRTSquaredTestSetup is Utils {
         string memory description = "Proposal: Set rate limit refill rate";
 
         bytes memory data = abi.encodeWithSelector(
-            LRTSquared.setRefillRatePerSecond.selector,
+            ILRTSquared.setRefillRatePerSecond.selector,
             refillRate
         );
 
@@ -248,7 +258,7 @@ contract LRTSquaredTestSetup is Utils {
         string memory description = "Proposal: Set rate limit time period";
 
         bytes memory data = abi.encodeWithSelector(
-            LRTSquared.setRateLimitTimePeriod.selector,
+            ILRTSquared.setRateLimitTimePeriod.selector,
             timePeriod
         );
 
@@ -262,7 +272,7 @@ contract LRTSquaredTestSetup is Utils {
         string memory description = "Proposal: Set rate limit percentage";
 
         bytes memory data = abi.encodeWithSelector(
-            LRTSquared.setPercentageRateLimit.selector,
+            ILRTSquared.setPercentageRateLimit.selector,
             percentageLimit
         );
 
@@ -278,7 +288,7 @@ contract LRTSquaredTestSetup is Utils {
         string memory description = "Proposal: Set rate limit config";
 
         bytes memory data = abi.encodeWithSelector(
-            LRTSquared.setRateLimitConfig.selector,
+            ILRTSquared.setRateLimitConfig.selector,
             __percentageLimit,
             __timePeriod, 
             __refillRate

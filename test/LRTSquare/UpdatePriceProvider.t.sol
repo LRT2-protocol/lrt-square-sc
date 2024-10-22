@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredTestSetup, LRTSquared, MockPriceProvider} from "./LRTSquaredSetup.t.sol";
+import {LRTSquaredTestSetup, ILRTSquared, MockPriceProvider} from "./LRTSquaredSetup.t.sol";
 
 contract LRTSquaredUpdatePriceProviderTest is LRTSquaredTestSetup {
     function test_UpdatePriceProviderWithGovernance() public {
@@ -15,7 +15,7 @@ contract LRTSquaredUpdatePriceProviderTest is LRTSquaredTestSetup {
     function test_CannotUpdatePriceProviderIfAddressZero() public {
         _updatePriceProvider(
             address(0),
-            abi.encodeWithSelector(LRTSquared.InvalidValue.selector)
+            abi.encodeWithSelector(ILRTSquared.InvalidValue.selector)
         );
     }
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredTestSetup, LRTSquared, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
+import {LRTSquaredTestSetup, ILRTSquared, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
 import {BucketLimiter} from "../../src/libraries/BucketLimiter.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Governable} from "../../src/governance/Governable.sol";
@@ -10,7 +10,7 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
     using Math for uint256;
 
     uint256 initialDeposit = 100 ether;
-    LRTSquared.RateLimit rateLimit;
+    ILRTSquared.RateLimit rateLimit;
     
     uint256[] assetIndices;
     address[] assets;
@@ -88,7 +88,7 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
         expectedSharesAfterDeposit -= fee;
 
         vm.expectEmit(true, true, true, true);
-        emit LRTSquared.Deposit(
+        emit ILRTSquared.Deposit(
             owner,
             merkleDistributor,
             expectedSharesAfterDeposit,
@@ -105,7 +105,7 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
         tokens[0].approve(address(lrtSquared), amountGreaterThanCapacity);
         amounts[0] = amountGreaterThanCapacity;
 
-        vm.expectRevert(LRTSquared.RateLimitExceeded.selector);
+        vm.expectRevert(ILRTSquared.RateLimitExceeded.selector);
         lrtSquared.deposit(assets, amounts, merkleDistributor);
     }
 
@@ -124,7 +124,7 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
         expectedSharesAfterDeposit -= depositFee;
 
         vm.expectEmit(true, true, true, true);
-        emit LRTSquared.Deposit(
+        emit ILRTSquared.Deposit(
             owner,
             merkleDistributor,
             expectedSharesAfterDeposit,

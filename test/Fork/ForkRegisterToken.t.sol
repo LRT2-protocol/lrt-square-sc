@@ -2,7 +2,7 @@
 // pragma solidity ^0.8.24;
 
 // import {Utils} from "../Utils.sol";
-// import {LRTSquared} from "../../src/LRTSquared.sol";
+// import {ILRTSquared} from "../../src/interfaces/ILRTSquared.sol";
 // import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 // import {PriceProvider} from "../../src/PriceProvider.sol";
 // import {IAggregatorV3} from "../../src/interfaces/IAggregatorV3.sol";
@@ -11,7 +11,7 @@
 //     using SafeERC20 for IERC20;
 
 //     address alice = makeAddr("alice");
-//     LRTSquared lrtSquared = LRTSquared(0x8F08B70456eb22f6109F57b8fafE862ED28E6040);
+//     ILRTSquared lrtSquared = ILRTSquared(0x8F08B70456eb22f6109F57b8fafE862ED28E6040);
 //     PriceProvider priceProvider = PriceProvider(0x2B90103cdc9Bba6c0dBCAaF961F0B5b1920F19E3);
 //     address newToken = 0xFe0c30065B384F05761f15d0CC899D4F9F9Cc0eB;
 //     address tokenOracle = 0x19678515847d8DE85034dAD0390e09c3048d31cd;

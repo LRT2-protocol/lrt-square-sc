@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredTestSetup, IPriceProvider, LRTSquared, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
+import {LRTSquaredTestSetup, IPriceProvider, ILRTSquared, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
 import {Swapper1InchV6} from "../../src/Swapper1InchV6.sol";
 import {PriceProvider} from "../../src/PriceProvider.sol";
 import {IAggregatorV3} from "../../src/interfaces/IAggregatorV3.sol";
@@ -175,7 +175,7 @@ contract LRTSquaredRebalanceTest is LRTSquaredTestSetup {
 
         vm.startPrank(address(timelock));
         vm.expectEmit(true, true, true, true);
-        emit LRTSquared.RebalancerSet(lrtSquared.rebalancer(), alice);
+        emit ILRTSquared.RebalancerSet(lrtSquared.rebalancer(), alice);
         lrtSquared.setRebalancer(alice);
         assertEq(lrtSquared.rebalancer(), alice);
         vm.stopPrank();
@@ -183,19 +183,19 @@ contract LRTSquaredRebalanceTest is LRTSquaredTestSetup {
 
     function test_RebalancerCannotBeAddressZero() public {
         vm.prank(address(timelock));
-        vm.expectRevert(LRTSquared.InvalidValue.selector);
+        vm.expectRevert(ILRTSquared.InvalidValue.selector);
         lrtSquared.setRebalancer(address(0));
     }
 
     function test_OnlyRebalancerCanSetMaxSlippage() public {
         uint256 newMaxSlippage = 1 ether;
         vm.prank(alice);
-        vm.expectRevert(LRTSquared.OnlyRebalancer.selector);
+        vm.expectRevert(ILRTSquared.OnlyRebalancer.selector);
         lrtSquared.setMaxSlippageForRebalancing(newMaxSlippage);
 
         vm.startPrank(rebalancer);
         vm.expectEmit(true, true, true, true);
-        emit LRTSquared.MaxSlippageForRebalanceSet(lrtSquared.maxSlippageForRebalancing(), newMaxSlippage);
+        emit ILRTSquared.MaxSlippageForRebalanceSet(lrtSquared.maxSlippageForRebalancing(), newMaxSlippage);
         lrtSquared.setMaxSlippageForRebalancing(newMaxSlippage);
         assertEq(lrtSquared.maxSlippageForRebalancing(), newMaxSlippage);
         vm.stopPrank();
@@ -203,7 +203,7 @@ contract LRTSquaredRebalanceTest is LRTSquaredTestSetup {
 
     function test_MaxSlippageCannotBeZero() public {
         vm.prank(rebalancer);
-        vm.expectRevert(LRTSquared.InvalidValue.selector);
+        vm.expectRevert(ILRTSquared.InvalidValue.selector);
         lrtSquared.setMaxSlippageForRebalancing(0);
     }
 
@@ -214,20 +214,20 @@ contract LRTSquaredRebalanceTest is LRTSquaredTestSetup {
         
         vm.prank(address(timelock));
         vm.expectEmit(true, true, true, true);
-        emit LRTSquared.WhitelistRebalanceOutputToken(weETH, true);
+        emit ILRTSquared.WhitelistRebalanceOutputToken(weETH, true);
         lrtSquared.whitelistRebalacingOutputToken(weETH, true);
         assertEq(lrtSquared.isWhitelistedRebalanceOutputToken(weETH), true);
     }
 
     function test_CannotWhitelistAddressZeroAsRebalanceOutputToken() public {
         vm.prank(address(timelock));
-        vm.expectRevert(LRTSquared.InvalidValue.selector);
+        vm.expectRevert(ILRTSquared.InvalidValue.selector);
         lrtSquared.whitelistRebalacingOutputToken(address(0), true);
     }
 
     function test_CannotWhitelistAsRebalanceOutputTokenIfTokenNotRegistered() public {
         vm.prank(address(timelock));
-        vm.expectRevert(LRTSquared.TokenNotRegistered.selector);
+        vm.expectRevert(ILRTSquared.TokenNotRegistered.selector);
         lrtSquared.whitelistRebalacingOutputToken(address(1), true);
     }
 
@@ -237,19 +237,19 @@ contract LRTSquaredRebalanceTest is LRTSquaredTestSetup {
         lrtSquared.updatePriceProvider(address(priceProvider));
 
         vm.prank(address(timelock));
-        vm.expectRevert(LRTSquared.PriceProviderNotConfigured.selector);
+        vm.expectRevert(ILRTSquared.PriceProviderNotConfigured.selector);
         lrtSquared.whitelistRebalacingOutputToken(weETH, true);
     }
 
     function test_CannotRebalanceIfInputTokenNotRegistered() public {
         vm.prank(rebalancer);
-        vm.expectRevert(LRTSquared.TokenNotRegistered.selector);
+        vm.expectRevert(ILRTSquared.TokenNotRegistered.selector);
         lrtSquared.rebalance(address(1), btc, 1, 1, hex"");
     }
 
     function test_CannotRebalanceIfOutputTokenNotRegistered() public {
         vm.prank(rebalancer);
-        vm.expectRevert(LRTSquared.TokenNotRegistered.selector);
+        vm.expectRevert(ILRTSquared.TokenNotRegistered.selector);
         lrtSquared.rebalance(weETH, address(1), 1, 1, hex"");
     }
 
@@ -258,7 +258,7 @@ contract LRTSquaredRebalanceTest is LRTSquaredTestSetup {
         lrtSquared.updateWhitelist(btc, false);
 
         vm.prank(rebalancer);
-        vm.expectRevert(LRTSquared.TokenNotWhitelisted.selector);
+        vm.expectRevert(ILRTSquared.TokenNotWhitelisted.selector);
         lrtSquared.rebalance(weETH, btc, 1, 1, hex"");
     }
 
@@ -267,7 +267,7 @@ contract LRTSquaredRebalanceTest is LRTSquaredTestSetup {
         lrtSquared.whitelistRebalacingOutputToken(btc, false);
 
         vm.prank(rebalancer);
-        vm.expectRevert(LRTSquared.NotAValidRebalanceOutputToken.selector);
+        vm.expectRevert(ILRTSquared.NotAValidRebalanceOutputToken.selector);
         lrtSquared.rebalance(weETH, btc, 1, 1, hex"");
     }
 }

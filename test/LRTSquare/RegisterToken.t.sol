@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredTestSetup, LRTSquared} from "./LRTSquaredSetup.t.sol";
+import {LRTSquaredTestSetup, ILRTSquared} from "./LRTSquaredSetup.t.sol";
 
 contract LRTSquaredRegisterTokenTest is LRTSquaredTestSetup {
     function test_RegisterTokenWithGovernance() public {
@@ -14,7 +14,7 @@ contract LRTSquaredRegisterTokenTest is LRTSquaredTestSetup {
         _registerToken(
             address(0),
             0,
-            abi.encodeWithSelector(LRTSquared.InvalidValue.selector)
+            abi.encodeWithSelector(ILRTSquared.InvalidValue.selector)
         );
     }
 
@@ -24,7 +24,7 @@ contract LRTSquaredRegisterTokenTest is LRTSquaredTestSetup {
         _registerToken(
             address(tokens[0]),
             0,
-            abi.encodeWithSelector(LRTSquared.TokenAlreadyRegistered.selector)
+            abi.encodeWithSelector(ILRTSquared.TokenAlreadyRegistered.selector)
         );
     }
 
@@ -35,7 +35,7 @@ contract LRTSquaredRegisterTokenTest is LRTSquaredTestSetup {
             address(tokens[0]),
             0,
             abi.encodeWithSelector(
-                LRTSquared.PriceProviderNotConfigured.selector
+                ILRTSquared.PriceProviderNotConfigured.selector
             )
         );
     }
@@ -45,7 +45,7 @@ contract LRTSquaredRegisterTokenTest is LRTSquaredTestSetup {
             address(tokens[0]),
             lrtSquared.HUNDRED_PERCENT_LIMIT() + 1,
             abi.encodeWithSelector(
-                LRTSquared.WeightLimitCannotBeGreaterThanHundred.selector
+                ILRTSquared.WeightLimitCannotBeGreaterThanHundred.selector
             )
         );
     }

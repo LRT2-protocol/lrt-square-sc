@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquared, Governable} from "../src/LRTSquared.sol";
+import {ILRTSquared} from "../src/interfaces/ILRTSquared.sol";
 import {PriceProvider} from "../src/PriceProvider.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {Utils} from "./Utils.sol";
@@ -20,7 +20,7 @@ contract RegisterNewToken is Utils {
     });
     
     PriceProvider priceProvider = PriceProvider(0x2B90103cdc9Bba6c0dBCAaF961F0B5b1920F19E3);
-    LRTSquared lrtSquared = LRTSquared(0x8F08B70456eb22f6109F57b8fafE862ED28E6040);
+    ILRTSquared lrtSquared = ILRTSquared(0x8F08B70456eb22f6109F57b8fafE862ED28E6040);
 
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");

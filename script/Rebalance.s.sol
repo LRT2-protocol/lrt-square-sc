@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquared, Governable} from "../src/LRTSquared.sol";
+import {ILRTSquared} from "../src/interfaces/ILRTSquared.sol";
 import {Utils, ChainConfig} from "./Utils.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
@@ -12,7 +12,7 @@ contract RebalanceLRTSquared is Utils {
         vm.startBroadcast(deployerPrivateKey);
 
         string memory deployments = readDeploymentFile();
-        LRTSquared lrtSquared = LRTSquared(stdJson.readAddress(
+        ILRTSquared lrtSquared = ILRTSquared(stdJson.readAddress(
             deployments,
             string.concat(".", "addresses", ".", "lrtSquaredProxy")
         ));

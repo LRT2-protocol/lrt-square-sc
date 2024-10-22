@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredTestSetup, LRTSquared, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
+import {LRTSquaredTestSetup, ILRTSquared, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract LRTSquaredTokenLimitTest is LRTSquaredTestSetup {
@@ -68,14 +68,14 @@ contract LRTSquaredTokenLimitTest is LRTSquaredTestSetup {
     }
 
     function test_SetMaxPercentageForATokenInVault() public {
-        (,,uint64 maxPercentageBefore) = lrtSquared.tokenInfos(address(tokens[0]));
+        uint64 maxPercentageBefore = lrtSquared.tokenInfos(address(tokens[0])).positionWeightLimit;
         assertEq(maxPercentageBefore, lrtSquared.HUNDRED_PERCENT_LIMIT());
 
         // 1 gwei is 100% 
         uint64 newMaxPercentage = 0.1 gwei; // 10%
         _updateTokenPositionWeightLimit(address(tokens[0]), newMaxPercentage, hex"");
 
-        ( , , uint64 maxPercentageAfter) = lrtSquared.tokenInfos(address(tokens[0]));
+        uint64 maxPercentageAfter = lrtSquared.tokenInfos(address(tokens[0])).positionWeightLimit;
         assertEq(maxPercentageAfter, newMaxPercentage);
     }
 
@@ -83,7 +83,7 @@ contract LRTSquaredTokenLimitTest is LRTSquaredTestSetup {
         _updateTokenPositionWeightLimit(
             address(0), 
             1, 
-            abi.encodeWithSelector(LRTSquared.InvalidValue.selector)
+            abi.encodeWithSelector(ILRTSquared.InvalidValue.selector)
         );
     }
 
@@ -91,7 +91,7 @@ contract LRTSquaredTokenLimitTest is LRTSquaredTestSetup {
         _updateTokenPositionWeightLimit(
             address(1), 
             1, 
-            abi.encodeWithSelector(LRTSquared.TokenNotRegistered.selector)
+            abi.encodeWithSelector(ILRTSquared.TokenNotRegistered.selector)
         );
     }
 
@@ -99,7 +99,7 @@ contract LRTSquaredTokenLimitTest is LRTSquaredTestSetup {
         _updateTokenPositionWeightLimit(
             address(tokens[0]), 
             lrtSquared.HUNDRED_PERCENT_LIMIT() + 1, 
-            abi.encodeWithSelector(LRTSquared.WeightLimitCannotBeGreaterThanHundred.selector)
+            abi.encodeWithSelector(ILRTSquared.WeightLimitCannotBeGreaterThanHundred.selector)
         );
     }
 
@@ -158,7 +158,7 @@ contract LRTSquaredTokenLimitTest is LRTSquaredTestSetup {
         
         vm.startPrank(owner);
         tokens[1].approve(address(lrtSquared), initialDepositToken0);
-        vm.expectRevert(LRTSquared.TokenWeightLimitBreached.selector);
+        vm.expectRevert(ILRTSquared.TokenWeightLimitBreached.selector);
         lrtSquared.deposit(assetsToSupply, amountsToSupply, merkleDistributor);
         vm.stopPrank(); 
     }
