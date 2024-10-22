@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquareTestSetup, LRTSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
+import {LRTSquaredTestSetup, LRTSquared, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
+contract LRTSquaredTokenLimitTest is LRTSquaredTestSetup {
     using Math for uint256;
 
     uint256 initialDepositToken0 = 100 ether;
@@ -29,12 +29,12 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
         tokens[0].mint(owner, 1000000 ether);
 
         vm.startPrank(owner);
-        tokens[0].approve(address(lrtSquare), initialDepositToken0);
+        tokens[0].approve(address(lrtSquared), initialDepositToken0);
         assetIndices.push(0);
         assets.push(address(tokens[0]));
         amounts.push(initialDepositToken0);
 
-        (uint256 sharesToMint, uint256 feeForDeposit) = lrtSquare.previewDeposit(assets, amounts);
+        (uint256 sharesToMint, uint256 feeForDeposit) = lrtSquared.previewDeposit(assets, amounts);
         uint256 expectedShares = (amounts[0] * tokenPrices[0]) / 1 ether;
         uint256 fee = expectedShares.mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
         expectedShares -= fee;
@@ -51,31 +51,31 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
         ); 
         
         // 100 ether * 0.1 ether / 1 ether = 10 ether worth
-        lrtSquare.deposit(assets, amounts, merkleDistributor);
+        lrtSquared.deposit(assets, amounts, merkleDistributor);
         // 10 ether LRT^2 == {tokens[0]: 100 ether}
 
-        (uint256 tvl, ) = lrtSquare.tvl();
+        (uint256 tvl, ) = lrtSquared.tvl();
         assertApproxEqAbs(
             tvl,
             (amounts[0] * tokenPrices[0]) / 1 ether,
             1
         );
         assertEq(
-            lrtSquare.totalSupply(),
+            lrtSquared.totalSupply(),
             100 * priceProvider.getPriceInEth(address(tokens[0]))
         ); // initial mint
         vm.stopPrank();
     }
 
     function test_SetMaxPercentageForATokenInVault() public {
-        (,,uint64 maxPercentageBefore) = lrtSquare.tokenInfos(address(tokens[0]));
-        assertEq(maxPercentageBefore, lrtSquare.HUNDRED_PERCENT_LIMIT());
+        (,,uint64 maxPercentageBefore) = lrtSquared.tokenInfos(address(tokens[0]));
+        assertEq(maxPercentageBefore, lrtSquared.HUNDRED_PERCENT_LIMIT());
 
         // 1 gwei is 100% 
         uint64 newMaxPercentage = 0.1 gwei; // 10%
         _updateTokenPositionWeightLimit(address(tokens[0]), newMaxPercentage, hex"");
 
-        ( , , uint64 maxPercentageAfter) = lrtSquare.tokenInfos(address(tokens[0]));
+        ( , , uint64 maxPercentageAfter) = lrtSquared.tokenInfos(address(tokens[0]));
         assertEq(maxPercentageAfter, newMaxPercentage);
     }
 
@@ -83,7 +83,7 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
         _updateTokenPositionWeightLimit(
             address(0), 
             1, 
-            abi.encodeWithSelector(LRTSquare.InvalidValue.selector)
+            abi.encodeWithSelector(LRTSquared.InvalidValue.selector)
         );
     }
 
@@ -91,15 +91,15 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
         _updateTokenPositionWeightLimit(
             address(1), 
             1, 
-            abi.encodeWithSelector(LRTSquare.TokenNotRegistered.selector)
+            abi.encodeWithSelector(LRTSquared.TokenNotRegistered.selector)
         );
     }
 
     function test_CannotSetMaxPercentageForATokenIfPercentageIsGreaterThanHundred() public {
         _updateTokenPositionWeightLimit(
             address(tokens[0]), 
-            lrtSquare.HUNDRED_PERCENT_LIMIT() + 1, 
-            abi.encodeWithSelector(LRTSquare.WeightLimitCannotBeGreaterThanHundred.selector)
+            lrtSquared.HUNDRED_PERCENT_LIMIT() + 1, 
+            abi.encodeWithSelector(LRTSquared.WeightLimitCannotBeGreaterThanHundred.selector)
         );
     }
 
@@ -125,11 +125,11 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
         amountsToSupply[0] = amountToken1;
         
         vm.startPrank(owner);
-        tokens[1].approve(address(lrtSquare), initialDepositToken0);
-        lrtSquare.deposit(assetsToSupply, amountsToSupply, merkleDistributor);
+        tokens[1].approve(address(lrtSquared), initialDepositToken0);
+        lrtSquared.deposit(assetsToSupply, amountsToSupply, merkleDistributor);
         vm.stopPrank(); 
 
-        ( , uint64[] memory percentages) = lrtSquare.positionWeightLimit();
+        ( , uint64[] memory percentages) = lrtSquared.positionWeightLimit();
         assertEq(percentages[0], 0.5 gwei);
         assertEq(percentages[1], 0.5 gwei);
     }
@@ -157,9 +157,9 @@ contract LRTSquareTokenLimitTest is LRTSquareTestSetup {
         amountsToSupply[0] = amountToken1;
         
         vm.startPrank(owner);
-        tokens[1].approve(address(lrtSquare), initialDepositToken0);
-        vm.expectRevert(LRTSquare.TokenWeightLimitBreached.selector);
-        lrtSquare.deposit(assetsToSupply, amountsToSupply, merkleDistributor);
+        tokens[1].approve(address(lrtSquared), initialDepositToken0);
+        vm.expectRevert(LRTSquared.TokenWeightLimitBreached.selector);
+        lrtSquared.deposit(assetsToSupply, amountsToSupply, merkleDistributor);
         vm.stopPrank(); 
     }
 }

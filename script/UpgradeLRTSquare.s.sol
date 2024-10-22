@@ -1,26 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquare, Governable} from "../src/LRTSquare.sol";
+import {LRTSquared, Governable} from "../src/LRTSquared.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {Utils} from "./Utils.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
-contract UpgradeLRTSquare is Utils {
+contract UpgradeLRTSquared is Utils {
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
         vm.startBroadcast(deployerPrivateKey);
 
         string memory deployments = readDeploymentFile();
-        address lrtSquare = stdJson.readAddress(
+        address lrtSquared = stdJson.readAddress(
             deployments,
-            string.concat(".", "addresses", ".", "lrtSquareProxy")
+            string.concat(".", "addresses", ".", "lrtSquaredProxy")
         );
 
-        address newImpl = address(new LRTSquare());
+        address newImpl = address(new LRTSquared());
 
-        UUPSUpgradeable(lrtSquare).upgradeToAndCall(newImpl, "");
+        UUPSUpgradeable(lrtSquared).upgradeToAndCall(newImpl, "");
 
         vm.stopBroadcast();
     }

@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquareTestSetup, LRTSquare} from "./LRTSquareSetup.t.sol";
+import {LRTSquaredTestSetup, LRTSquared} from "./LRTSquaredSetup.t.sol";
 
-contract LRTSquareRegisterTokenTest is LRTSquareTestSetup {
+contract LRTSquaredRegisterTokenTest is LRTSquaredTestSetup {
     function test_RegisterTokenWithGovernance() public {
-        assertEq(lrtSquare.isTokenRegistered(address(tokens[0])), false);
+        assertEq(lrtSquared.isTokenRegistered(address(tokens[0])), false);
         _registerToken(address(tokens[0]), tokenPositionWeightLimits[0], hex"");
-        assertEq(lrtSquare.isTokenRegistered(address(tokens[0])), true);
+        assertEq(lrtSquared.isTokenRegistered(address(tokens[0])), true);
     }
 
     function test_CannotRegisterTokenIfAddressZero() public {
         _registerToken(
             address(0),
             0,
-            abi.encodeWithSelector(LRTSquare.InvalidValue.selector)
+            abi.encodeWithSelector(LRTSquared.InvalidValue.selector)
         );
     }
 
@@ -24,7 +24,7 @@ contract LRTSquareRegisterTokenTest is LRTSquareTestSetup {
         _registerToken(
             address(tokens[0]),
             0,
-            abi.encodeWithSelector(LRTSquare.TokenAlreadyRegistered.selector)
+            abi.encodeWithSelector(LRTSquared.TokenAlreadyRegistered.selector)
         );
     }
 
@@ -35,7 +35,7 @@ contract LRTSquareRegisterTokenTest is LRTSquareTestSetup {
             address(tokens[0]),
             0,
             abi.encodeWithSelector(
-                LRTSquare.PriceProviderNotConfigured.selector
+                LRTSquared.PriceProviderNotConfigured.selector
             )
         );
     }
@@ -43,9 +43,9 @@ contract LRTSquareRegisterTokenTest is LRTSquareTestSetup {
     function test_CannotRegisterTokenIfMaxPercentageIsTooHigh() public {
         _registerToken(
             address(tokens[0]),
-            lrtSquare.HUNDRED_PERCENT_LIMIT() + 1,
+            lrtSquared.HUNDRED_PERCENT_LIMIT() + 1,
             abi.encodeWithSelector(
-                LRTSquare.WeightLimitCannotBeGreaterThanHundred.selector
+                LRTSquared.WeightLimitCannotBeGreaterThanHundred.selector
             )
         );
     }
