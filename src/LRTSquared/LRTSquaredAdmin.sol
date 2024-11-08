@@ -20,14 +20,14 @@ contract LRTSquaredAdmin is LRTSquaredStorage {
         emit WhitelistRebalanceOutputToken(_token, _shouldWhitelist);
     }
 
-    function setFee(Fee memory __fee) external onlyGovernor {
-        _setFee(__fee);
+    function setFee(Fee memory _fee) external onlyGovernor {
+        _setFee(_fee);
     }
 
     function setTreasuryAddress(address treasury) external onlyGovernor {
         if (treasury == address(0)) revert InvalidValue();
-        emit TreasurySet(_fee.treasury, treasury);
-        _fee.treasury = treasury;
+        emit TreasurySet(fee.treasury, treasury);
+        fee.treasury = treasury;
     }
 
     function setSwapper(address _swapper) external onlyGovernor {

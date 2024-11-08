@@ -56,7 +56,7 @@ contract LRTSquaredCore is LRTSquaredStorage {
         if (balanceOf(msg.sender) < vaultShares) revert InsufficientShares();
         
         (address[] memory assets, uint256[] memory assetAmounts, uint256 feeForRedemption) = previewRedeem(vaultShares);
-        if (feeForRedemption != 0) _transfer(msg.sender, _fee.treasury, feeForRedemption);
+        if (feeForRedemption != 0) _transfer(msg.sender, fee.treasury, feeForRedemption);
         _burn(msg.sender, vaultShares - feeForRedemption);
 
         for (uint256 i = 0; i < assets.length; i++) 
@@ -68,13 +68,13 @@ contract LRTSquaredCore is LRTSquaredStorage {
     function previewDeposit(address[] memory _tokens, uint256[] memory _amounts) public view returns (uint256, uint256) {
         uint256 rewardsValueInEth = getTokenValuesInEth(_tokens, _amounts);
         uint256 shareToMint = _convertToShares(rewardsValueInEth, Math.Rounding.Floor);
-        uint256 feeForDeposit = shareToMint.mulDiv(_fee.depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
+        uint256 feeForDeposit = shareToMint.mulDiv(fee.depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
 
         return (shareToMint - feeForDeposit, feeForDeposit);
     }
 
     function previewRedeem(uint256 vaultShares) public view returns (address[] memory, uint256[] memory, uint256) {
-        uint256 feeForRedemption = vaultShares.mulDiv(_fee.redeemFeeInBps, HUNDRED_PERCENT_IN_BPS);
+        uint256 feeForRedemption = vaultShares.mulDiv(fee.redeemFeeInBps, HUNDRED_PERCENT_IN_BPS);
         (address[] memory assets, uint256[] memory assetAmounts) = assetsForVaultShares(vaultShares - feeForRedemption);
 
         return (assets, assetAmounts, feeForRedemption);
@@ -213,7 +213,7 @@ contract LRTSquaredCore is LRTSquaredStorage {
             }
         }
 
-        if (depositFee != 0) _mint(_fee.treasury, depositFee);
+        if (depositFee != 0) _mint(fee.treasury, depositFee);
         _mint(recipientForMintedShare, shareToMint);
     }
 

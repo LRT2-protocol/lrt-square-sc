@@ -82,7 +82,7 @@ contract LRTSquaredStorage is
     // deposited amount after community pause
     uint256 public communityPauseDepositedAmt;
     // fee struct
-    Fee internal _fee;
+    Fee public fee;
     // keccak256("LRTSquared.admin.impl");
     bytes32 constant adminImplPosition = 0x67f3bdb99ec85305417f06f626cf52c7dee7e44607664b5f1cce0af5d822472f;
 
@@ -167,10 +167,6 @@ contract LRTSquaredStorage is
 
     function tokenInfos(address token) external view returns (TokenInfo memory) {
         return _tokenInfos[token];
-    }
-
-    function fee() external view returns (Fee memory) {
-        return _fee;
     }
 
     function _getVaultTokenValuesInEth(
@@ -273,15 +269,15 @@ contract LRTSquaredStorage is
         if (!success) revert EtherTransferFailed();
     }
 
-    function _setFee(Fee memory __fee) internal {
+    function _setFee(Fee memory _fee) internal {
         if (
-            __fee.treasury == address(0) || 
-            __fee.depositFeeInBps > HUNDRED_PERCENT_IN_BPS || 
-            __fee.redeemFeeInBps > HUNDRED_PERCENT_IN_BPS
+            _fee.treasury == address(0) || 
+            _fee.depositFeeInBps > HUNDRED_PERCENT_IN_BPS || 
+            _fee.redeemFeeInBps > HUNDRED_PERCENT_IN_BPS
         ) revert InvalidValue();
         
-        emit FeeSet(_fee, __fee);
-        _fee = __fee;
+        emit FeeSet(fee, _fee);
+        fee = _fee;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyGovernor {}
