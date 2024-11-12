@@ -55,6 +55,11 @@ contract LRTSquaredStorage is
         uint48 redeemFeeInBps;
     }
 
+    struct StrategyConfig {
+        address strategyAdapter;
+        uint96 maxSlippageInBps;
+    }
+
     uint64 public constant HUNDRED_PERCENT_LIMIT = 1_000_000_000;
     uint64 public constant HUNDRED_PERCENT_IN_BPS = 10000;
 
@@ -83,6 +88,10 @@ contract LRTSquaredStorage is
     uint256 public communityPauseDepositedAmt;
     // fee struct
     Fee public fee;
+    // strategy config for tokens
+    mapping (address token => StrategyConfig strategyConfig) public tokenStrategyConfig;
+    // max slippage for strategy = 1% 
+    uint256 public constant MAX_SLIPPAGE_FOR_STRATEGY_IN_BPS = 100;
     // keccak256("LRTSquared.admin.impl");
     bytes32 constant adminImplPosition = 0x67f3bdb99ec85305417f06f626cf52c7dee7e44607664b5f1cce0af5d822472f;
 
@@ -107,6 +116,7 @@ contract LRTSquaredStorage is
     event Rebalance(address fromAsset, address toAsset, uint256 fromAssetAmount,uint256 toAssetAmount);
     event FeeSet(Fee oldFee, Fee newFee);
     event TreasurySet(address oldTreasury, address newTreasury);
+    event StrategyConfigSet(address indexed token, address indexed strategyAdapter, uint96 maxSlippageInBps);
 
     error TokenAlreadyRegistered();
     error TokenNotWhitelisted();
@@ -134,8 +144,14 @@ contract LRTSquaredStorage is
     error InsufficientTokensReceivedFromSwapper();
     error ApplicableSlippageGreaterThanMaxLimit();
     error AlreadyInSameState();
+    error StrategyAdapterCannotBeAddressZero();
+    error SlippageCannotBeGreaterThanMaxLimit();
+    error AmountCannotBeZero();
+    error TokenStrategyConfigNotSet();
+    error StrategyReturnTokenCannotBeAddressZero();
+    error StrategyReturnTokenNotRegistered();
+    error PriceProviderNotConfiguredForStrategyReturnToken();
     
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();

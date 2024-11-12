@@ -24,6 +24,11 @@ interface ILRTSquared is IERC20 {
         uint48 redeemFeeInBps;
     }
 
+    struct StrategyConfig {
+        address strategyAdapter;
+        uint96 maxSlippageInBps;
+    }
+
     event TokenRegistered(address token);
     event TokenWhitelisted(address token, bool whitelisted);
     event PriceProviderSet(address oldPriceProvider, address newPriceProvider);
@@ -45,6 +50,7 @@ interface ILRTSquared is IERC20 {
     event Rebalance(address fromAsset, address toAsset, uint256 fromAssetAmount,uint256 toAssetAmount);
     event FeeSet(Fee oldFee, Fee newFee);
     event TreasurySet(address oldTreasury, address newTreasury);
+    event StrategyConfigSet(address indexed token, address indexed strategyAdapter, uint96 maxSlippageInBps);
 
     error TokenAlreadyRegistered();
     error TokenNotWhitelisted();
@@ -72,9 +78,17 @@ interface ILRTSquared is IERC20 {
     error InsufficientTokensReceivedFromSwapper();
     error ApplicableSlippageGreaterThanMaxLimit();
     error AlreadyInSameState();
-    
+    error StrategyAdapterCannotBeAddressZero();
+    error SlippageCannotBeGreaterThanMaxLimit();
+    error AmountCannotBeZero();
+    error TokenStrategyConfigNotSet();
+    error StrategyReturnTokenCannotBeAddressZero();
+    error StrategyReturnTokenNotRegistered();
+    error PriceProviderNotConfiguredForStrategyReturnToken();
+
     function HUNDRED_PERCENT_LIMIT() external pure returns (uint64);
     function HUNDRED_PERCENT_IN_BPS() external pure returns (uint64);
+    function MAX_SLIPPAGE_FOR_STRATEGY_IN_BPS() external pure returns (uint256);
     function tokenInfos(address token) external view returns (TokenInfo memory);
     function depositor(address account) external view returns (bool);
     function tokens(uint256 index) external view returns (address);
@@ -88,6 +102,7 @@ interface ILRTSquared is IERC20 {
     function depositForCommunityPause() external view returns (uint256);
     function communityPauseDepositedAmt() external view returns (uint256);
     function fee() external view returns (Fee memory);
+    function tokenStrategyConfig(address token) external view returns (StrategyConfig memory);
     function getRateLimit() external view returns (RateLimit memory);
     function whitelistRebalacingOutputToken(address _token, bool _shouldWhitelist) external;
     function setFee(Fee memory _fee) external;
@@ -106,6 +121,8 @@ interface ILRTSquared is IERC20 {
     function setRateLimitTimePeriod(uint64 __timePeriod) external;
     function setRefillRatePerSecond(uint64 __refillRate) external;
     function setPercentageRateLimit(uint128 __percentageLimit) external;
+    function setTokenStrategyConfig(address token, StrategyConfig memory strategyConfig) external;
+    function depositToStrategy(address token, uint256 amount) external;
     function deposit(address[] memory _tokens, uint256[] memory _amounts, address _receiver) external;
     function redeem(uint256 vaultShares) external;
     function previewDeposit(address[] memory _tokens, uint256[] memory _amounts) external view returns (uint256, uint256);
