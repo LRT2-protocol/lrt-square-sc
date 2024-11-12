@@ -25,8 +25,9 @@ contract BoringVaultPriceProvider is Ownable {
 
     IPriceProvider public priceProvider;
     mapping (address token => address underlyingToken) public vaultTokenToUnderlyingToken;
+    mapping (address token => uint8 priceDecimals) public decimals;
 
-    event VaultTokenToUnderlyingTokenSet(address indexed vaultToken, address indexed underlyingToken);
+    event VaultTokenToUnderlyingTokenSet(address indexed vaultToken, address indexed underlyingToken, uint8 priceDecimals);
     event PriceProviderSet(address indexed oldProvider, address indexed newProvider);
 
     error ArrayLengthMismatch();
@@ -35,13 +36,15 @@ contract BoringVaultPriceProvider is Ownable {
     error PriceProviderNotConfigured();
     error TokenUnderlyingAssetNotSet();
 
-    constructor(address _owner, address _priceProvider, address[] memory vaultTokens, address[] memory underlyingTokens) Ownable(_owner) {
+    constructor(
+        address _owner, 
+        address _priceProvider, 
+        address[] memory vaultTokens, 
+        address[] memory underlyingTokens, 
+        uint8[] memory priceDecimals
+    ) Ownable(_owner) {
         priceProvider = IPriceProvider(_priceProvider);
-        _setVaultTokenToUnderlyingToken(vaultTokens, underlyingTokens);
-    }
-
-    function decimals() external pure returns (uint8) {
-        return 18;
+        _setVaultTokenToUnderlyingToken(vaultTokens, underlyingTokens, priceDecimals);
     }
 
     function getPriceInEth(address token) external view returns (uint256) {
@@ -53,8 +56,12 @@ contract BoringVaultPriceProvider is Ownable {
         return underlyingTokenPriceInEth.mulDiv(exchangeRate, 1 ether);
     }
 
-    function setVaultTokenToUnderlyingToken(address[] memory vaultTokens, address[] memory underlyingTokens) external onlyOwner {
-        _setVaultTokenToUnderlyingToken(vaultTokens, underlyingTokens);
+    function setVaultTokenToUnderlyingToken(
+        address[] memory vaultTokens, 
+        address[] memory underlyingTokens, 
+        uint8[] memory priceDecimals
+    ) external onlyOwner {
+        _setVaultTokenToUnderlyingToken(vaultTokens, underlyingTokens, priceDecimals);
     }
 
     function setPriceProvider(address _priceProvider) external onlyOwner {
@@ -63,15 +70,16 @@ contract BoringVaultPriceProvider is Ownable {
         priceProvider = IPriceProvider(_priceProvider);
     }
 
-    function _setVaultTokenToUnderlyingToken(address[] memory vaultTokens, address[] memory underlyingTokens) internal {
+    function _setVaultTokenToUnderlyingToken(address[] memory vaultTokens, address[] memory underlyingTokens, uint8[] memory priceDecimals) internal {
         uint256 len = vaultTokens.length;
-        if (len != underlyingTokens.length) revert ArrayLengthMismatch();
+        if (len != underlyingTokens.length && len != priceDecimals.length) revert ArrayLengthMismatch();
         for (uint256 i = 0; i < len; ) {
             if (vaultTokens[i] == address(0) || underlyingTokens[i] == address(0)) revert TokenCannotBeZeroAddress();
             if (priceProvider.getPriceInEth(underlyingTokens[i]) == 0) revert PriceProviderNotConfigured();
 
             vaultTokenToUnderlyingToken[vaultTokens[i]] = underlyingTokens[i];
-            emit VaultTokenToUnderlyingTokenSet(vaultTokens[i], underlyingTokens[i]);
+            decimals[vaultTokens[i]] = priceDecimals[i]; 
+            emit VaultTokenToUnderlyingTokenSet(vaultTokens[i], underlyingTokens[i], priceDecimals[i]);
 
             unchecked {
                 ++i;

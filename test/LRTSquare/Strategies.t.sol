@@ -48,7 +48,11 @@ contract LRTSquaredStrategiesTest is Test {
         underlyingTokens[0] = eigen;
         underlyingTokens[1] = ethFi;
 
-        boringVaultPriceProvider = new BoringVaultPriceProvider(owner, address(priceProvider), vaultTokens, underlyingTokens);
+        uint8[] memory priceDecimals = new uint8[](2);
+        priceDecimals[0] = 18;
+        priceDecimals[1] = 18;
+
+        boringVaultPriceProvider = new BoringVaultPriceProvider(owner, address(priceProvider), vaultTokens, underlyingTokens, priceDecimals);
 
 
         address[] memory tokens = new address[](2);
@@ -60,7 +64,7 @@ contract LRTSquaredStrategiesTest is Test {
             oracle: address(boringVaultPriceProvider),
             priceFunctionCalldata: abi.encodeWithSelector(BoringVaultPriceProvider.getPriceInEth.selector, tokens[0]),
             isChainlinkType: false,
-            oraclePriceDecimals: IAggregatorV3(address(boringVaultPriceProvider)).decimals(),
+            oraclePriceDecimals: BoringVaultPriceProvider(address(boringVaultPriceProvider)).decimals(eEigen),
             maxStaleness: 1 days,
             dataType: PriceProvider.ReturnType.Uint256,
             isBaseTokenEth: true
@@ -69,7 +73,7 @@ contract LRTSquaredStrategiesTest is Test {
             oracle: address(boringVaultPriceProvider),
             priceFunctionCalldata: abi.encodeWithSelector(BoringVaultPriceProvider.getPriceInEth.selector, tokens[1]),
             isChainlinkType: false,
-            oraclePriceDecimals: IAggregatorV3(address(boringVaultPriceProvider)).decimals(),
+            oraclePriceDecimals: BoringVaultPriceProvider(address(boringVaultPriceProvider)).decimals(sEthFi),
             maxStaleness: 1 days,
             dataType: PriceProvider.ReturnType.Uint256,
             isBaseTokenEth: true

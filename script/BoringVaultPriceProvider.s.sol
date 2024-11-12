@@ -27,7 +27,11 @@ contract DeployBoringVaultPriceProvider is Utils {
         underlyingTokens[0] = eigen;
         underlyingTokens[1] = ethFi;
 
-        boringVaultPriceProvider = new BoringVaultPriceProvider(owner, priceProvider, vaultTokens, underlyingTokens);
+        uint8[] memory priceDecimals = new uint8[](2);
+        priceDecimals[0] = 18;
+        priceDecimals[1] = 18;
+
+        boringVaultPriceProvider = new BoringVaultPriceProvider(owner, priceProvider, vaultTokens, underlyingTokens, priceDecimals);
         vm.stopBroadcast();
     }
 }

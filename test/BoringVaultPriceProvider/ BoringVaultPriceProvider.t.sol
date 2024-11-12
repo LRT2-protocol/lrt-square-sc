@@ -30,13 +30,18 @@ contract BoringVaultPriceProviderTest is Test {
         underlyingTokens[0] = eigen;
         underlyingTokens[1] = ethFi;
 
-        boringVaultPriceProvider = new BoringVaultPriceProvider(owner, address(priceProvider), vaultTokens, underlyingTokens);
+        uint8[] memory priceDecimals = new uint8[](2);
+        priceDecimals[0] = 18;
+        priceDecimals[1] = 18;
+
+        boringVaultPriceProvider = new BoringVaultPriceProvider(owner, address(priceProvider), vaultTokens, underlyingTokens, priceDecimals);
 
         vm.stopPrank();
     }
 
     function test_VerifyDeployBoringVault() public view {
-        assertEq(boringVaultPriceProvider.decimals(), 18);
+        assertEq(boringVaultPriceProvider.decimals(eEigen), 18);
+        assertEq(boringVaultPriceProvider.decimals(sEthFi), 18);
         assertEq(boringVaultPriceProvider.vaultTokenToUnderlyingToken(eEigen), eigen);
         assertEq(boringVaultPriceProvider.vaultTokenToUnderlyingToken(sEthFi), ethFi);
     }
@@ -59,9 +64,12 @@ contract BoringVaultPriceProviderTest is Test {
         address[] memory underlyingTokens = new address[](1);
         underlyingTokens[0] = eEigen;
 
+        uint8[] memory priceDecimals = new uint8[](1);
+        priceDecimals[0] = 18;
+
         vm.prank(owner);
         vm.expectRevert(PriceProvider.TokenOracleNotSet.selector);
-        boringVaultPriceProvider.setVaultTokenToUnderlyingToken(vaultTokens, underlyingTokens);
+        boringVaultPriceProvider.setVaultTokenToUnderlyingToken(vaultTokens, underlyingTokens, priceDecimals);
     }
 
     function test_CannotSetZeroAddressAsVaultTokenOrUnderlyingToken() public {
@@ -70,16 +78,19 @@ contract BoringVaultPriceProviderTest is Test {
 
         address[] memory underlyingTokens = new address[](1);
         underlyingTokens[0] = eigen;
+
+        uint8[] memory priceDecimals = new uint8[](1);
+        priceDecimals[0] = 18;
         
         vm.prank(owner);
         vm.expectRevert(BoringVaultPriceProvider.TokenCannotBeZeroAddress.selector);
-        boringVaultPriceProvider.setVaultTokenToUnderlyingToken(vaultTokens, underlyingTokens);
+        boringVaultPriceProvider.setVaultTokenToUnderlyingToken(vaultTokens, underlyingTokens, priceDecimals);
         
         vaultTokens[0] = eEigen;
         underlyingTokens[0] = address(0);
         vm.prank(owner);
         vm.expectRevert(BoringVaultPriceProvider.TokenCannotBeZeroAddress.selector);
-        boringVaultPriceProvider.setVaultTokenToUnderlyingToken(vaultTokens, underlyingTokens);
+        boringVaultPriceProvider.setVaultTokenToUnderlyingToken(vaultTokens, underlyingTokens, priceDecimals);
     }
 
     function test_OnlyOwnerCanSetVaultTokenToUnderlyingToken() public {
@@ -91,9 +102,13 @@ contract BoringVaultPriceProviderTest is Test {
         underlyingTokens[0] = eigen;
         underlyingTokens[1] = ethFi;
 
+        uint8[] memory priceDecimals = new uint8[](2);
+        priceDecimals[0] = 18;
+        priceDecimals[1] = 18;
+
         vm.prank(address(1));
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(1)));
-        boringVaultPriceProvider.setVaultTokenToUnderlyingToken(vaultTokens, underlyingTokens);
+        boringVaultPriceProvider.setVaultTokenToUnderlyingToken(vaultTokens, underlyingTokens, priceDecimals);
     }
 
     function test_CanSetPriceProvider() public {
