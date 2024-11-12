@@ -14,6 +14,7 @@ import {IAggregatorV3} from "../../src/interfaces/IAggregatorV3.sol";
 import {BadStrategyWithReturnTokenZero} from "../../src/mocks/BadStrategyWithReturnTokenZero.sol";
 import {BadStrategyWithReturnTokenUnregistered} from "../../src/mocks/BadStrategyWithReturnTokenUnregistered.sol";
 import {Governable} from "../../src/governance/Governable.sol";
+import {BoringVaultPriceProvider, Ownable} from "../../src/BoringVaultPriceProvider.sol";
 
 contract LRTSquaredStrategiesTest is Test {
     using SafeERC20 for IERC20;
@@ -29,11 +30,9 @@ contract LRTSquaredStrategiesTest is Test {
     address eigen = 0xec53bF9167f50cDEB3Ae105f56099aaaB9061F83;
     address ethFi = 0xFe0c30065B384F05761f15d0CC899D4F9F9Cc0eB;
     address weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address eEigenOracle = 0xf2917e602C2dCa458937fad715bb1E465305A4A1;
-    address sEthFiOracle = 0xf2917e602C2dCa458937fad715bb1E465305A4A1;
-
     EEigenStrategy eEigenStrategy;
     SEthFiStrategy sEthFiStrategy;
+    BoringVaultPriceProvider boringVaultPriceProvider;
 
     function setUp() public {
         string memory mainnet = "https://eth-pokt.nodies.app";
@@ -41,30 +40,39 @@ contract LRTSquaredStrategiesTest is Test {
 
         vm.startPrank(owner);
 
+        address[] memory vaultTokens = new address[](2);
+        vaultTokens[0] = eEigen;
+        vaultTokens[1] = sEthFi;
+
+        address[] memory underlyingTokens = new address[](2);
+        underlyingTokens[0] = eigen;
+        underlyingTokens[1] = ethFi;
+
+        boringVaultPriceProvider = new BoringVaultPriceProvider(owner, address(priceProvider), vaultTokens, underlyingTokens);
+
+
         address[] memory tokens = new address[](2);
         tokens[0] = eEigen;
         tokens[1] = sEthFi;
 
         PriceProvider.Config[] memory priceProviderConfig = new PriceProvider.Config[](tokens.length);
-       
         priceProviderConfig[0] = PriceProvider.Config({
-            oracle: eEigenOracle,
-            priceFunctionCalldata: hex"",
-            isChainlinkType: true,
-            oraclePriceDecimals: IAggregatorV3(eEigenOracle).decimals(),
+            oracle: address(boringVaultPriceProvider),
+            priceFunctionCalldata: abi.encodeWithSelector(BoringVaultPriceProvider.getPriceInEth.selector, tokens[0]),
+            isChainlinkType: false,
+            oraclePriceDecimals: IAggregatorV3(address(boringVaultPriceProvider)).decimals(),
             maxStaleness: 1 days,
-            dataType: PriceProvider.ReturnType.Int256,
-            isBaseTokenEth: false
+            dataType: PriceProvider.ReturnType.Uint256,
+            isBaseTokenEth: true
         });
-       
         priceProviderConfig[1] = PriceProvider.Config({
-            oracle: sEthFiOracle,
-            priceFunctionCalldata: hex"",
-            isChainlinkType: true,
-            oraclePriceDecimals: IAggregatorV3(sEthFiOracle).decimals(),
+            oracle: address(boringVaultPriceProvider),
+            priceFunctionCalldata: abi.encodeWithSelector(BoringVaultPriceProvider.getPriceInEth.selector, tokens[1]),
+            isChainlinkType: false,
+            oraclePriceDecimals: IAggregatorV3(address(boringVaultPriceProvider)).decimals(),
             maxStaleness: 1 days,
-            dataType: PriceProvider.ReturnType.Int256,
-            isBaseTokenEth: false
+            dataType: PriceProvider.ReturnType.Uint256,
+            isBaseTokenEth: true
         });
 
         priceProvider.setTokenConfig(tokens, priceProviderConfig);
