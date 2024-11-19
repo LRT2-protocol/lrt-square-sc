@@ -211,6 +211,8 @@ contract LRTSquaredAdmin is LRTSquaredStorage {
             tokenStrategyConfig[token].strategyAdapter, 
             abi.encodeWithSelector(BaseStrategy.deposit.selector, token, amount, tokenStrategyConfig[token].maxSlippageInBps)
         );
+
+        _verifyPositionLimits();
     }
 
     function delegateCall(
