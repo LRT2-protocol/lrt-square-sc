@@ -36,6 +36,7 @@ contract LRTSquaredCore is LRTSquaredStorage {
         if (initialDeposit) rateLimit.renewTimestamp = uint64(block.timestamp + rateLimit.timePeriod);
         // check rate limit
         if(!rateLimit.limit.consume(uint128(shareToMint + depositFee))) revert RateLimitExceeded();
+        if (shareToMint == 0) revert SharesCannotBeZero();
         
         _deposit(_tokens, _amounts, shareToMint, depositFee, _receiver);
 
@@ -53,6 +54,7 @@ contract LRTSquaredCore is LRTSquaredStorage {
     /// @notice Redeem the underlying assets proportionate to the share of the caller.
     /// @param vaultShares amount of vault share token to redeem the underlying assets
     function redeem(uint256 vaultShares) external {
+        if (vaultShares == 0) revert SharesCannotBeZero();
         if (balanceOf(msg.sender) < vaultShares) revert InsufficientShares();
         
         (address[] memory assets, uint256[] memory assetAmounts, uint256 feeForRedemption) = previewRedeem(vaultShares);

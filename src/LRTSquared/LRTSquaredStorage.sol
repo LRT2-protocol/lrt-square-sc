@@ -151,6 +151,7 @@ contract LRTSquaredStorage is
     error StrategyReturnTokenCannotBeAddressZero();
     error StrategyReturnTokenNotRegistered();
     error PriceProviderNotConfiguredForStrategyReturnToken();
+    error SharesCannotBeZero();
     
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
