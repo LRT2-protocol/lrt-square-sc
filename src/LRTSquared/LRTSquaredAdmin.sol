@@ -2,6 +2,7 @@
 pragma solidity ^0.8.25;
 
 import {LRTSquaredStorage, BucketLimiter, Math, SafeERC20, IERC20, IPriceProvider, ISwapper} from "./LRTSquaredStorage.sol";
+import {BaseStrategy} from "../strategies/BaseStrategy.sol";
 
 contract LRTSquaredAdmin is LRTSquaredStorage {
     using BucketLimiter for BucketLimiter.Limit;
@@ -182,6 +183,75 @@ contract LRTSquaredAdmin is LRTSquaredStorage {
     function setCommunityPauseDepositAmount(uint256 amount) external onlyGovernor {
         emit CommunityPauseDepositSet(depositForCommunityPause, amount);
         depositForCommunityPause = amount;
+    }
+
+    function setTokenStrategyConfig(address token, StrategyConfig memory strategyConfig) external onlyGovernor {
+        if (token == address(0)) revert InvalidValue();
+        if(!isTokenRegistered(token)) revert TokenNotRegistered();
+        if (IPriceProvider(priceProvider).getPriceInEth(token) == 0) revert PriceProviderNotConfigured();
+
+        if (strategyConfig.strategyAdapter == address(0)) revert StrategyAdapterCannotBeAddressZero();
+        if (strategyConfig.maxSlippageInBps > MAX_SLIPPAGE_FOR_STRATEGY_IN_BPS) revert SlippageCannotBeGreaterThanMaxLimit();
+
+        address returnToken = BaseStrategy(strategyConfig.strategyAdapter).returnToken();
+        if (returnToken == address(0)) revert StrategyReturnTokenCannotBeAddressZero();
+        if(!isTokenRegistered(returnToken)) revert StrategyReturnTokenNotRegistered();
+        if (IPriceProvider(priceProvider).getPriceInEth(returnToken) == 0) revert PriceProviderNotConfiguredForStrategyReturnToken();
+
+        tokenStrategyConfig[token] = strategyConfig;
+        emit StrategyConfigSet(token, strategyConfig.strategyAdapter, strategyConfig.maxSlippageInBps);
+    }
+
+    function depositToStrategy(address token, uint256 amount) external onlyGovernor {
+        if (amount == type(uint256).max) amount = IERC20(token).balanceOf(address(this));
+        if (amount == 0) revert AmountCannotBeZero();
+
+        if (tokenStrategyConfig[token].strategyAdapter == address(0)) revert TokenStrategyConfigNotSet();
+        delegateCall(
+            tokenStrategyConfig[token].strategyAdapter, 
+            abi.encodeWithSelector(BaseStrategy.deposit.selector, token, amount, tokenStrategyConfig[token].maxSlippageInBps)
+        );
+
+        _verifyPositionLimits();
+    }
+
+    function delegateCall(
+        address target,
+        bytes memory data
+    ) internal returns (bytes memory result) {
+        require(target != address(this), "delegatecall to self");
+
+        // solhint-disable-next-line no-inline-assembly
+        assembly ("memory-safe") {
+            // Perform delegatecall to the target contract
+            let success := delegatecall(
+                gas(),
+                target,
+                add(data, 0x20),
+                mload(data),
+                0,
+                0
+            )
+
+            // Get the size of the returned data
+            let size := returndatasize()
+
+            // Allocate memory for the return data
+            result := mload(0x40)
+
+            // Set the length of the return data
+            mstore(result, size)
+
+            // Copy the return data to the allocated memory
+            returndatacopy(add(result, 0x20), 0, size)
+
+            // Update the free memory pointer
+            mstore(0x40, add(result, add(0x20, size)))
+
+            if iszero(success) {
+                revert(result, returndatasize())
+            }
+        }
     }
 
     modifier onlyRebalancer() {

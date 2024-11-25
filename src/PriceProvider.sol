@@ -37,6 +37,7 @@ contract PriceProvider is IPriceProvider, Governable, Initializable, UUPSUpgrade
     error PriceOracleFailed();
     error InvalidPrice();
     error OraclePriceTooOld();
+    error OracleCannotBeZeroAddress();
 
     constructor() {
         _disableInitializers();
@@ -139,6 +140,7 @@ contract PriceProvider is IPriceProvider, Governable, Initializable, UUPSUpgrade
         require(len == _configs.length, "ARRAY_LENGTH_MISMATCH");
 
         for (uint256 i = 0; i < len; ) {
+            if (_configs[i].oracle == address(0)) revert OracleCannotBeZeroAddress();
             tokenConfig[_tokens[i]] = _configs[i];
             unchecked {
                 ++i;
