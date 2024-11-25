@@ -20,6 +20,9 @@ report
 # Dotenv file
 .env
 
+# Certora
+.certora_internal
+
 # vscode
 .vscode/
 

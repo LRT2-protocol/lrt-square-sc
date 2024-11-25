@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.25;
 
-import {LRTSquareTestSetup, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
+import {LRTSquaredTestSetup, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
+contract LRTSquaredTestAvsRewardScenario is LRTSquaredTestSetup {
     using Math for uint256;    
     
     function setUp() public override {
@@ -21,7 +21,7 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
     }
 
     function test_avs_rewards_scenario_1() public {
-        (uint256 tvl, uint256 tvlUsd) = lrtSquare.tvl();
+        (uint256 tvl, uint256 tvlUsd) = lrtSquared.tvl();
         assertApproxEqAbs(tvl, 0, 0);
 
         // 1. At week-0, ether.fi receives an AVS reward 'tokens[0]'
@@ -30,8 +30,8 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
         //
         // Perform `distributeRewards`
         // - initial price of `tokens[0]` is 0.1 ether per token
-        // - ether.fi sends the 'tokens[0]' rewards 100 ether to the LrtSquare vault
-        // - ether.fi mints LRT^2 tokens 10 ether to MerkleDistributor. MerkleDistributor will distribute the LrtSquare to Alice
+        // - ether.fi sends the 'tokens[0]' rewards 100 ether to the LrtSquared vault
+        // - ether.fi mints LRT^2 tokens 10 ether to MerkleDistributor. MerkleDistributor will distribute the LrtSquared to Alice
 
         (uint256 ethUsdPrice, uint8 ethUsdDecimals) = priceProvider.getEthUsdPrice();
         vm.prank(address(timelock));
@@ -39,23 +39,23 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
 
         {
             vm.startPrank(owner);
-            tokens[0].approve(address(lrtSquare), 100 ether);
+            tokens[0].approve(address(lrtSquared), 100 ether);
             address[] memory assets = new address[](1);
             uint256[] memory amounts = new uint256[](1);
             assets[0] = address(tokens[0]);
             amounts[0] = 100 ether;
 
-            (uint256 sharesToMint, ) = lrtSquare.previewDeposit(assets, amounts);
+            (uint256 sharesToMint, ) = lrtSquared.previewDeposit(assets, amounts);
 
             assertApproxEqAbs(
                 sharesToMint,
                 _deductFee((amounts[0] * tokenPrices[0]) / 1 ether),
                 1
             ); // 100 ether * 0.1 ether / 1 ether = 10 ether worth
-            lrtSquare.deposit(assets, amounts, merkleDistributor);
+            lrtSquared.deposit(assets, amounts, merkleDistributor);
             // 10 ether LRT^2 == {tokens[0]: 100 ether}
 
-            (tvl, tvlUsd) = lrtSquare.tvl();
+            (tvl, tvlUsd) = lrtSquared.tvl();
             assertApproxEqAbs(
                 tvl,
                 (amounts[0] * tokenPrices[0]) / 1 ether,
@@ -67,7 +67,7 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
                 1
             );
             assertEq(
-                lrtSquare.totalSupply(),
+                lrtSquared.totalSupply(),
                 100 * priceProvider.getPriceInEth(address(tokens[0]))
             ); // initial mint
             vm.stopPrank();
@@ -81,7 +81,7 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
 
         {
             vm.startPrank(owner);
-            tokens[0].approve(address(lrtSquare), 200 ether);
+            tokens[0].approve(address(lrtSquared), 200 ether);
             address[] memory assets = new address[](1);
             uint256[] memory amounts = new uint256[](1);
             assets[0] = address(tokens[0]);
@@ -92,11 +92,11 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
                 _deductFee((amounts[0] * tokenPrices[0]) / 1 ether),
                 1
             ); // 200 ether * 0.1 ether / 1 ether = 20 ether worth
-            lrtSquare.deposit(assets, amounts, merkleDistributor);
+            lrtSquared.deposit(assets, amounts, merkleDistributor);
             // (10 + 20) ether LRT^2 == {tokens[0]: 100 + 200 ether}
             // --> 1 ether LRT^2 == {tokens[0]: 10 ether}
 
-            (tvl, tvlUsd) = lrtSquare.tvl();
+            (tvl, tvlUsd) = lrtSquared.tvl();
             assertApproxEqAbs(
                 tvl,
                 (100 + 200) * tokenPrices[0],
@@ -118,13 +118,13 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
         tokens[0].mint(owner, 100 ether);
         {
             vm.startPrank(owner);
-            tokens[0].approve(address(lrtSquare), 100 ether);
+            tokens[0].approve(address(lrtSquared), 100 ether);
             address[] memory assets = new address[](1);
             uint256[] memory amounts = new uint256[](1);
             assets[0] = address(tokens[0]);
             amounts[0] = 100 ether;
 
-            // lrtSquare.deposit(assets, amounts, 20 ether, merkleDistributor);
+            // lrtSquared.deposit(assets, amounts, 20 ether, merkleDistributor);
             /// @dev this will be unfair distribution to the existing holders of LRT^2
             // (10 + 20 + 20) ether LRT^2 == {tokens[0]: 100 + 200 + 100 ether}
             // After 'distributeRewards'. the value of LRT^2 token has decreased
@@ -140,10 +140,10 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
                 _deductFee((amounts[0] * tokenPrices[0]) / 1 ether),
                 1
             ); // 100 ether * 0.1 ether / 1 ether = 10 ether worth
-            lrtSquare.deposit(assets, amounts, merkleDistributor);
+            lrtSquared.deposit(assets, amounts, merkleDistributor);
             // (10 + 20 + 10) ether LRT^2 == {tokens[0]: 100 + 200 + 100 ether}
             // --> 1 ether LRT^2 == {tokens[0]: 10 ether}
-            (tvl, tvlUsd) = lrtSquare.tvl();
+            (tvl, tvlUsd) = lrtSquared.tvl();
             assertApproxEqAbs(
                 tvl,
                 (100 + 200 + 100) * tokenPrices[0],
@@ -171,8 +171,8 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
 
         {
             vm.startPrank(owner);
-            tokens[0].approve(address(lrtSquare), 100 ether);
-            tokens[1].approve(address(lrtSquare), 10 * 10 ** tokenDecimals[1]);
+            tokens[0].approve(address(lrtSquared), 100 ether);
+            tokens[1].approve(address(lrtSquared), 10 * 10 ** tokenDecimals[1]);
 
             address[] memory assets = new address[](2);
             uint256[] memory amounts = new uint256[](2);
@@ -201,9 +201,9 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
                     10 ** tokenDecimals[1]),
                 1
             ); // 100 * 0.1 ether + 10 * 0.5 ether = 15 ether worth
-            lrtSquare.deposit(assets, amounts, merkleDistributor);
+            lrtSquared.deposit(assets, amounts, merkleDistributor);
 
-            (tvl, tvlUsd) = lrtSquare.tvl();
+            (tvl, tvlUsd) = lrtSquared.tvl();
             assertApproxEqAbs(
                 tvl,
                 (100 + 200 + 100 + 100) * tokenPrices[0] + 10 * tokenPrices[1],
@@ -226,7 +226,7 @@ contract LrtSquareTestAvsRewardScenario is LRTSquareTestSetup {
         address[] memory assets, 
         uint256[] memory amounts
     ) internal view returns (uint256) {
-        (uint256 sharesToMint, ) = lrtSquare.previewDeposit(assets, amounts);
+        (uint256 sharesToMint, ) = lrtSquared.previewDeposit(assets, amounts);
         return sharesToMint;
     }
 }

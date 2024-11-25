@@ -3,7 +3,7 @@ pragma solidity ^0.8.25;
 
 import {Utils, ChainConfig} from "./Utils.sol";
 import {Swapper1InchV6} from "../src/Swapper1InchV6.sol";
-import {LRTSquare} from "../src/LRTSquare.sol";
+import {ILRTSquared} from "../src/interfaces/ILRTSquared.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 contract UpgradeSwapper1InchV6 is Utils {
@@ -19,12 +19,12 @@ contract UpgradeSwapper1InchV6 is Utils {
         swapper = new Swapper1InchV6(config.swapRouter1InchV6);
 
         string memory deployments = readDeploymentFile();
-        address lrtSquare = stdJson.readAddress(
+        address lrtSquared = stdJson.readAddress(
             deployments,
-            string.concat(".", "addresses", ".", "lrtSquareProxy")
+            string.concat(".", "addresses", ".", "lrtSquaredProxy")
         );
 
-        LRTSquare(lrtSquare).setSwapper(address(swapper));
+        ILRTSquared(lrtSquared).setSwapper(address(swapper));
         vm.stopBroadcast();
     }
 }

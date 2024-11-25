@@ -4,11 +4,15 @@ pragma solidity ^0.8.25;
 import {Utils} from "../Utils.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
-import {LRTSquare, Governable} from "../../src/LRTSquare.sol";
+import {ILRTSquared} from "../../src/interfaces/ILRTSquared.sol";
+import {LRTSquaredStorage, Governable} from "../../src/LRTSquared/LRTSquaredStorage.sol";
+import {LRTSquaredAdmin} from "../../src/LRTSquared/LRTSquaredAdmin.sol";
+import {LRTSquaredInitializer} from "../../src/LRTSquared/LRTSquaredInitializer.sol";
+import {LRTSquaredCore} from "../../src/LRTSquared/LRTSquaredCore.sol";
 import {UUPSProxy} from "src/UUPSProxy.sol";
 import {MockPriceProvider} from "../../src/mocks/MockPriceProvider.sol";
 import {GovernanceToken} from "../../src/governance/GovernanceToken.sol";
-import {LRTSquareGovernor} from "../../src/governance/Governance.sol";
+import {LRTSquaredGovernor} from "../../src/governance/Governance.sol";
 import {Timelock} from "../../src/governance/Timelock.sol";
 import {MockERC20} from "../../src/mocks/MockERC20.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
@@ -27,12 +31,12 @@ interface IPriceProvider {
     function setPrice(address token, uint256 price) external;
 }
 
-contract LRTSquareTestSetup is Utils {
+contract LRTSquaredTestSetup is Utils {
     using SafeERC20 for IERC20;
 
     address pauser = makeAddr("pauser");
     address treasury = makeAddr("treasury");
-    LRTSquare public lrtSquare;
+    ILRTSquared public lrtSquared;
 
     MockERC20[] public tokens;
     IPriceProvider public priceProvider;
@@ -47,7 +51,7 @@ contract LRTSquareTestSetup is Utils {
     address public merkleDistributor = vm.addr(1000);
 
     GovernanceToken govToken;
-    LRTSquareGovernor governance;
+    LRTSquaredGovernor governance;
     Timelock timelock;
 
     uint256[] tokenPrices;
@@ -68,7 +72,7 @@ contract LRTSquareTestSetup is Utils {
         address admin = owner;
         govToken = new GovernanceToken("GovToken", "GTK", totalSupply);
         timelock = new Timelock(proposers, executors, admin);
-        governance = new LRTSquareGovernor(IVotes(address(govToken)), timelock);
+        governance = new LRTSquaredGovernor(IVotes(address(govToken)), timelock);
 
         timelock.grantRole(timelock.PROPOSER_ROLE(), address(governance));
         timelock.grantRole(timelock.EXECUTOR_ROLE(), address(0));
@@ -100,18 +104,21 @@ contract LRTSquareTestSetup is Utils {
         tokens[1].mint(owner, 100 ether);
         tokens[2].mint(owner, 100 ether);
 
-        LRTSquare.Fee memory fee = LRTSquare.Fee({
+        LRTSquaredStorage.Fee memory fee = LRTSquaredStorage.Fee({
             treasury: treasury,
             depositFeeInBps: depositFeeInBps,
             redeemFeeInBps: redeemFeeInBps
         });
 
-        lrtSquare = LRTSquare(
-            address(new UUPSProxy(address(new LRTSquare()), ""))
-        );
-        lrtSquare.initialize(
-            "LrtSquare",
-            "LRT",
+        address lrtSquaredCoreImpl = address(new LRTSquaredCore());
+        address lrtSquaredAdminImpl = address(new LRTSquaredAdmin());
+        address lrtSquaredInitializer = address(new LRTSquaredInitializer());
+        address lrtSquaredProxy = address(new UUPSProxy(lrtSquaredInitializer, ""));
+        lrtSquared = ILRTSquared(lrtSquaredProxy);
+
+        LRTSquaredInitializer(address(lrtSquared)).initialize(
+            "LRTSquared",
+            "LRT2",
             address(timelock),
             pauser,
             rebalancer, 
@@ -123,8 +130,11 @@ contract LRTSquareTestSetup is Utils {
         );
         vm.stopPrank();
 
-        vm.prank(address(timelock));
-        lrtSquare.updatePriceProvider(address(priceProvider));
+        vm.startPrank(address(timelock));
+        LRTSquaredCore(address(lrtSquared)).upgradeToAndCall(lrtSquaredCoreImpl, "");
+        LRTSquaredCore(address(lrtSquared)).setAdminImpl(lrtSquaredAdminImpl);
+        lrtSquared.updatePriceProvider(address(priceProvider));
+        vm.stopPrank();
     }
 
     function _registerToken(address token, uint256 tokenMaxPercentage, bytes memory revertData) internal {
@@ -138,7 +148,7 @@ contract LRTSquareTestSetup is Utils {
         );
 
         bytes memory data = abi.encodeWithSelector(
-            LRTSquare.registerToken.selector,
+            ILRTSquared.registerToken.selector,
             token,
             tokenMaxPercentage
         );
@@ -162,7 +172,7 @@ contract LRTSquareTestSetup is Utils {
             )
         );
         bytes memory data = abi.encodeWithSelector(
-            LRTSquare.updateWhitelist.selector,
+            ILRTSquared.updateWhitelist.selector,
             token,
             whitelist
         );
@@ -183,7 +193,7 @@ contract LRTSquareTestSetup is Utils {
             )
         );
         bytes memory data = abi.encodeWithSelector(
-            LRTSquare.updatePriceProvider.selector,
+            ILRTSquared.updatePriceProvider.selector,
             _priceProvider
         );
 
@@ -198,7 +208,7 @@ contract LRTSquareTestSetup is Utils {
         string memory description = "Proposal: Set depositors";
 
         bytes memory data = abi.encodeWithSelector(
-            LRTSquare.setDepositors.selector,
+            ILRTSquared.setDepositors.selector,
             depositors,
             isDepositor
         );
@@ -219,7 +229,7 @@ contract LRTSquareTestSetup is Utils {
         );
 
         bytes memory data = abi.encodeWithSelector(
-            LRTSquare.updateTokenPositionWeightLimit.selector,
+            ILRTSquared.updateTokenPositionWeightLimit.selector,
             token,
             maxPercentage
         );
@@ -234,7 +244,7 @@ contract LRTSquareTestSetup is Utils {
         string memory description = "Proposal: Set rate limit refill rate";
 
         bytes memory data = abi.encodeWithSelector(
-            LRTSquare.setRefillRatePerSecond.selector,
+            ILRTSquared.setRefillRatePerSecond.selector,
             refillRate
         );
 
@@ -248,7 +258,7 @@ contract LRTSquareTestSetup is Utils {
         string memory description = "Proposal: Set rate limit time period";
 
         bytes memory data = abi.encodeWithSelector(
-            LRTSquare.setRateLimitTimePeriod.selector,
+            ILRTSquared.setRateLimitTimePeriod.selector,
             timePeriod
         );
 
@@ -262,7 +272,7 @@ contract LRTSquareTestSetup is Utils {
         string memory description = "Proposal: Set rate limit percentage";
 
         bytes memory data = abi.encodeWithSelector(
-            LRTSquare.setPercentageRateLimit.selector,
+            ILRTSquared.setPercentageRateLimit.selector,
             percentageLimit
         );
 
@@ -278,7 +288,7 @@ contract LRTSquareTestSetup is Utils {
         string memory description = "Proposal: Set rate limit config";
 
         bytes memory data = abi.encodeWithSelector(
-            LRTSquare.setRateLimitConfig.selector,
+            ILRTSquared.setRateLimitConfig.selector,
             __percentageLimit,
             __timePeriod, 
             __refillRate
@@ -297,7 +307,7 @@ contract LRTSquareTestSetup is Utils {
         bytes[] memory calldatas = new bytes[](1);
         bytes32 descriptionHash = keccak256(bytes(description));
 
-        targets[0] = address(lrtSquare);
+        targets[0] = address(lrtSquared);
         values[0] = 0;
         calldatas[0] = data;
 
@@ -369,15 +379,15 @@ contract LRTSquareTestSetup is Utils {
         address asset
     ) internal view returns (uint256) {
         return
-            (vaultShare * (IERC20(asset).balanceOf(address(lrtSquare)) + 1)) /
-            (lrtSquare.totalSupply() + 1);
+            (vaultShare * (IERC20(asset).balanceOf(address(lrtSquared)) + 1)) /
+            (lrtSquared.totalSupply() + 1);
     }
 
     function _getSharesForEth(
         uint256 valueInEth
     ) internal view returns (uint256) {
-        uint256 _totalSupply = lrtSquare.totalSupply();
-        (uint256 _vaultTokenValuesInEth, ) = lrtSquare.fairValueOf(
+        uint256 _totalSupply = lrtSquared.totalSupply();
+        (uint256 _vaultTokenValuesInEth, ) = lrtSquared.fairValueOf(
             _totalSupply
         );
 

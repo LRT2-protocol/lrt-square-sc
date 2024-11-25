@@ -1,29 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquareTestSetup, LRTSquare, IERC20, SafeERC20} from "./LRTSquareSetup.t.sol";
+import {LRTSquaredTestSetup, ILRTSquared, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Governable} from "../../src/governance/Governable.sol";
 
-contract LRTSquareFeeTest is LRTSquareTestSetup {
+contract LRTSquaredFeeTest is LRTSquaredTestSetup {
     function test_CanSetFee() public {
         address treasuryAddr = vm.addr(0x11111);
         uint48 depositFee = 1;
         uint48 redeemFee = 2;
 
-        LRTSquare.Fee memory fee = LRTSquare.Fee(treasuryAddr, depositFee, redeemFee);
+        ILRTSquared.Fee memory fee = ILRTSquared.Fee(treasuryAddr, depositFee, redeemFee);
         vm.prank(address(timelock));
-        lrtSquare.setFee(fee);
+        lrtSquared.setFee(fee);
 
-        (
-            address treasuryAddrFromContract, 
-            uint48 depositFeeFromContract, 
-            uint48 redeemFeeFromContract
-        ) = lrtSquare.fee();
+        ILRTSquared.Fee memory feeFromContract = lrtSquared.fee();
 
-        assertEq(treasuryAddr, treasuryAddrFromContract);
-        assertEq(depositFee, depositFeeFromContract);
-        assertEq(redeemFee, redeemFeeFromContract);
+        assertEq(treasuryAddr, feeFromContract.treasury);
+        assertEq(depositFee, feeFromContract.depositFeeInBps);
+        assertEq(redeemFee, feeFromContract.redeemFeeInBps);
     }
 
     function test_OnlyGovernorCanSetFee() public {
@@ -31,10 +27,10 @@ contract LRTSquareFeeTest is LRTSquareTestSetup {
         uint48 depositFee = 1;
         uint48 redeemFee = 2;
 
-        LRTSquare.Fee memory fee = LRTSquare.Fee(treasuryAddr, depositFee, redeemFee);
+        ILRTSquared.Fee memory fee = ILRTSquared.Fee(treasuryAddr, depositFee, redeemFee);
         vm.prank(alice);
         vm.expectRevert(Governable.OnlyGovernor.selector);
-        lrtSquare.setFee(fee);
+        lrtSquared.setFee(fee);
     }
 
     function test_DepositFeeCannotBeGreaterThanHundredPercent() public {
@@ -42,10 +38,10 @@ contract LRTSquareFeeTest is LRTSquareTestSetup {
         uint48 depositFee = HUNDRED_PERCENT_IN_BPS + 1;
         uint48 redeemFee = 2;
 
-        LRTSquare.Fee memory fee = LRTSquare.Fee(treasuryAddr, depositFee, redeemFee);
+        ILRTSquared.Fee memory fee = ILRTSquared.Fee(treasuryAddr, depositFee, redeemFee);
         vm.prank(address(timelock));
-        vm.expectRevert(LRTSquare.InvalidValue.selector);
-        lrtSquare.setFee(fee);
+        vm.expectRevert(ILRTSquared.InvalidValue.selector);
+        lrtSquared.setFee(fee);
     }
 
     function test_RedeemFeeCannotBeGreaterThanHundredPercent() public {
@@ -53,10 +49,10 @@ contract LRTSquareFeeTest is LRTSquareTestSetup {
         uint48 depositFee = 1;
         uint48 redeemFee = HUNDRED_PERCENT_IN_BPS + 1;
 
-        LRTSquare.Fee memory fee = LRTSquare.Fee(treasuryAddr, depositFee, redeemFee);
+        ILRTSquared.Fee memory fee = ILRTSquared.Fee(treasuryAddr, depositFee, redeemFee);
         vm.prank(address(timelock));
-        vm.expectRevert(LRTSquare.InvalidValue.selector);
-        lrtSquare.setFee(fee);
+        vm.expectRevert(ILRTSquared.InvalidValue.selector);
+        lrtSquared.setFee(fee);
     }
     
     function test_TreasuryCannotBeZeroAddress() public {
@@ -64,23 +60,22 @@ contract LRTSquareFeeTest is LRTSquareTestSetup {
         uint48 depositFee = 1;
         uint48 redeemFee = 2;
 
-        LRTSquare.Fee memory fee = LRTSquare.Fee(treasuryAddr, depositFee, redeemFee);
+        ILRTSquared.Fee memory fee = ILRTSquared.Fee(treasuryAddr, depositFee, redeemFee);
         vm.prank(address(timelock));
-        vm.expectRevert(LRTSquare.InvalidValue.selector);
-        lrtSquare.setFee(fee);
+        vm.expectRevert(ILRTSquared.InvalidValue.selector);
+        lrtSquared.setFee(fee);
 
         vm.prank(address(timelock));
-        vm.expectRevert(LRTSquare.InvalidValue.selector);
-        lrtSquare.setTreasuryAddress(treasuryAddr);
+        vm.expectRevert(ILRTSquared.InvalidValue.selector);
+        lrtSquared.setTreasuryAddress(treasuryAddr);
     }
 
     function test_SetTreasury() public {
         address treasuryAddr = makeAddr("treasuryAddr");
         vm.prank(address(timelock));
-        lrtSquare.setTreasuryAddress(treasuryAddr);
+        lrtSquared.setTreasuryAddress(treasuryAddr);
 
-        (address treasuryAddrFromContract, , ) = lrtSquare.fee();
-
+        address treasuryAddrFromContract = lrtSquared.fee().treasury;
         assertEq(treasuryAddrFromContract, treasuryAddr);
     }
 }

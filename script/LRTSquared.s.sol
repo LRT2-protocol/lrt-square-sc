@@ -2,18 +2,22 @@
 pragma solidity ^0.8.25;
 
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {LRTSquare, Governable} from "../src/LRTSquare.sol";
+import {ILRTSquared} from "../src/interfaces/ILRTSquared.sol";
+import {LRTSquaredStorage, Governable} from "../src/LRTSquared/LRTSquaredStorage.sol";
+import {LRTSquaredAdmin} from "../src/LRTSquared/LRTSquaredAdmin.sol";
+import {LRTSquaredInitializer} from "../src/LRTSquared/LRTSquaredInitializer.sol";
+import {LRTSquaredCore} from "../src/LRTSquared/LRTSquaredCore.sol";
 import {UUPSProxy} from "../src/UUPSProxy.sol";
 import {PriceProvider} from "../src/PriceProvider.sol";
 import {Utils, ChainConfig} from "./Utils.sol";
 import {Swapper1InchV6} from "../src/Swapper1InchV6.sol";
 import {IAggregatorV3} from "../src/interfaces/IAggregatorV3.sol";
 
-contract DeployLRTSquare is Utils {
+contract DeployLRTSquared is Utils {
     using SafeERC20 for IERC20;
     
     string chainId;
-    LRTSquare public lrtSquare;
+    ILRTSquared public lrtSquared;
 
     address[] public tokens;
     PriceProvider public priceProvider;
@@ -30,7 +34,7 @@ contract DeployLRTSquare is Utils {
 
     uint128 percentageRateLimit = 10_000_000_000; // 1000%
     uint256 communityPauseDepositAmt = 4 ether;
-    LRTSquare.Fee fee;
+    LRTSquaredStorage.Fee fee;
 
     address depositor = 0xF46D3734564ef9a5a16fC3B1216831a28f78e2B5;
 
@@ -52,7 +56,7 @@ contract DeployLRTSquare is Utils {
 
         swapper = new Swapper1InchV6(swapRouter1InchV6);
 
-        fee = LRTSquare.Fee({
+        fee = LRTSquaredStorage.Fee({
             treasury: config.treasury,
             depositFeeInBps: config.depositFeeInBps,
             redeemFeeInBps: config.redeemFeeInBps
@@ -101,10 +105,14 @@ contract DeployLRTSquare is Utils {
             )
         );
 
-        address lrtSquareImpl = address(new LRTSquare());
-        lrtSquare = LRTSquare(address(new UUPSProxy(lrtSquareImpl, "")));
-        lrtSquare.initialize(
-            "LrtSquare",
+        address lrtSquaredCoreImpl = address(new LRTSquaredCore());
+        address lrtSquaredAdminImpl = address(new LRTSquaredAdmin());
+        address lrtSquaredInitializer = address(new LRTSquaredInitializer());
+        address lrtSquaredProxy = address(new UUPSProxy(lrtSquaredInitializer, ""));
+        lrtSquared = ILRTSquared(lrtSquaredProxy);
+
+        LRTSquaredInitializer(address(lrtSquared)).initialize(
+            "LRTSquared",
             "LRT2",
             deployer,
             pauser[0],
@@ -116,27 +124,31 @@ contract DeployLRTSquare is Utils {
             fee
         );
 
-        lrtSquare.setPauser(pauser[1], true);
+        LRTSquaredCore(address(lrtSquared)).upgradeToAndCall(lrtSquaredCoreImpl, "");
+        LRTSquaredCore(address(lrtSquared)).setAdminImpl(lrtSquaredAdminImpl);
+
+        lrtSquared.setPauser(pauser[1], true);
         
         tokens.pop();
         tokenPositionWeightLimits.pop();
 
         for (uint256 i = 0; i < tokens.length; ) {
-            lrtSquare.registerToken(tokens[i], tokenPositionWeightLimits[i]);
+            lrtSquared.registerToken(tokens[i], tokenPositionWeightLimits[i]);
             unchecked {
                 ++i;
             }
         }
 
-        // lrtSquare.whitelistRebalacingOutputToken(WETH, true);
-        lrtSquare.transferGovernance(owner);
+        lrtSquared.transferGovernance(owner);
 
         string memory parentObject = "parent object";
 
         string memory deployedAddresses = "addresses";
 
-        vm.serializeAddress(deployedAddresses, "lrtSquareProxt", address(lrtSquare));
-        vm.serializeAddress(deployedAddresses, "lrtSquareImpl", lrtSquareImpl);
+        vm.serializeAddress(deployedAddresses, "lrtSquaredProxy", address(lrtSquared));
+        vm.serializeAddress(deployedAddresses, "lrtSquaredCore", lrtSquaredCoreImpl);
+        vm.serializeAddress(deployedAddresses, "lrtSquaredAdmin", lrtSquaredAdminImpl);
+        vm.serializeAddress(deployedAddresses, "lrtSquaredInitializer", lrtSquaredInitializer);
         vm.serializeAddress(deployedAddresses, "priceProvider", address(priceProvider));
         vm.serializeAddress(
             deployedAddresses,

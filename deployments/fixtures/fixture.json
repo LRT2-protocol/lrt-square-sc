@@ -7,7 +7,7 @@
         "swapRouter1InchV6": "0x111111125421cA6dc452d289314280a0f8842A65",
         "ethfi": "0xFe0c30065B384F05761f15d0CC899D4F9F9Cc0eB",
         "eigen": "0xec53bF9167f50cDEB3Ae105f56099aaaB9061F83",
-        "ethfiChainlinkOracle": "",
+        "ethfiChainlinkOracle": "0x19678515847d8DE85034dAD0390e09c3048d31cd",
         "eigenChainlinkOracle": "0xf2917e602C2dCa458937fad715bb1E465305A4A1",
         "ethUsdChainlinkOracle": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
         "depositFeeInBps": "0", 

@@ -2,11 +2,11 @@
 pragma solidity ^0.8.25;
 
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {LRTSquare} from "../src/LRTSquare.sol";
+import {ILRTSquared} from "../src/interfaces/ILRTSquared.sol";
 import {Utils, ChainConfig} from "./Utils.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
-contract TestLRTSquare is Utils {
+contract TestLRTSquared is Utils {
     using SafeERC20 for IERC20;
 
     function run() public {
@@ -22,7 +22,7 @@ contract TestLRTSquare is Utils {
 
         string memory deployments = readDeploymentFile();
 
-        LRTSquare lrtSquare = LRTSquare(
+        ILRTSquared lrtSquare = ILRTSquared(
             stdJson.readAddress(
                 deployments,
                 string.concat(".", "addresses", ".", "lrtSquareProxy")

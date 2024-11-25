@@ -16,6 +16,9 @@ export const getData = async () => {
 
   if (!ONEINCH_API_KEY) throw new Error("Please set ONEINCH_API_KEY in the .env file");
 
+  if (!chainId || !fromAddress || !toAddress || !fromAsset || !toAsset || !fromAmount) 
+    throw new Error("Invalid inputs");
+
   const data = await getIInchSwapData({
     chainId,
     fromAddress,
