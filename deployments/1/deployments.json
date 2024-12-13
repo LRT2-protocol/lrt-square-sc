@@ -8,6 +8,9 @@
     "priceProviderImpl": "0x28A6e7EBB6Aca8f64145952a9565245c3DC1F32f",
     "priceProviderProxy": "0x2B90103cdc9Bba6c0dBCAaF961F0B5b1920F19E3",
     "rebalancer": "0xF46D3734564ef9a5a16fC3B1216831a28f78e2B5",
-    "swapper": "0x747Cac75776b3A0Bba3dE3E61ec12A6A7F52232E"
+    "swapper": "0x747Cac75776b3A0Bba3dE3E61ec12A6A7F52232E",
+    "SEthFiStrategy": "0x76C57e359C0eDA0aac54d97832fb1b4451805aD8",
+    "EEigenStrategy": "0x2F2342BD9fca72887f46De9522014f4cd154Cf3e",
+    "BoringVaultPriceProvider": "0x130e22952DD3DE2c80EBdFC2B256E344ff3A0729"
   }
 }
