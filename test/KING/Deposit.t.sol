@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredTestSetup, ILRTSquared, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
+import {KINGTestSetup, IKING, IERC20, SafeERC20} from "./KINGSetup.t.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-contract LRTSquaredDepositTest is LRTSquaredTestSetup {
+contract KINGDepositTest is KINGTestSetup {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -51,7 +51,7 @@ contract LRTSquaredDepositTest is LRTSquaredTestSetup {
             deal(_tokens[i], alice, _amounts[i]);
 
             IERC20(_tokens[i]).safeIncreaseAllowance(
-                address(lrtSquared),
+                address(king),
                 _amounts[i]
             );
             unchecked {
@@ -59,7 +59,7 @@ contract LRTSquaredDepositTest is LRTSquaredTestSetup {
             }
         }
         vm.expectEmit(true, true, true, true);
-        emit ILRTSquared.Deposit(
+        emit IKING.Deposit(
             alice,
             alice,
             expectedSharesAfterDeposit,
@@ -67,38 +67,38 @@ contract LRTSquaredDepositTest is LRTSquaredTestSetup {
             _tokens,
             _amounts
         );
-        lrtSquared.deposit(_tokens, _amounts, alice);
+        king.deposit(_tokens, _amounts, alice);
         vm.stopPrank();
 
         assertApproxEqAbs(
-            lrtSquared.balanceOf(alice),
+            king.balanceOf(alice),
             expectedSharesAfterDeposit,
             10
         );
 
         assertApproxEqAbs(
-            lrtSquared.balanceOf(treasury),
+            king.balanceOf(treasury),
             depositFee,
             10
         );
 
         assertApproxEqAbs(
-            lrtSquared.assetOf(alice, address(tokens[0])),
+            king.assetOf(alice, address(tokens[0])),
             _amounts[0].mulDiv(HUNDRED_PERCENT_IN_BPS - depositFeeInBps, HUNDRED_PERCENT_IN_BPS),
             10
         );
         assertApproxEqAbs(
-            lrtSquared.assetOf(alice, address(tokens[1])),
+            king.assetOf(alice, address(tokens[1])),
             _amounts[1].mulDiv(HUNDRED_PERCENT_IN_BPS - depositFeeInBps, HUNDRED_PERCENT_IN_BPS),
             10
         );
         assertApproxEqAbs(
-            lrtSquared.assetOf(alice, address(tokens[2])),
+            king.assetOf(alice, address(tokens[2])),
             _amounts[2].mulDiv(HUNDRED_PERCENT_IN_BPS - depositFeeInBps, HUNDRED_PERCENT_IN_BPS),
             10
         );
 
-        (address[] memory assets, uint256[] memory assetAmounts) = lrtSquared.totalAssets();
+        (address[] memory assets, uint256[] memory assetAmounts) = king.totalAssets();
         assertEq(assets.length, 3);
         assertEq(assetAmounts.length, 3);
 
@@ -123,8 +123,8 @@ contract LRTSquaredDepositTest is LRTSquaredTestSetup {
         _amounts[2] = 25 * 10 ** tokenDecimals[2];
 
         vm.prank(owner);
-        vm.expectRevert(ILRTSquared.OnlyDepositors.selector);
-        lrtSquared.deposit(_tokens, _amounts, owner);
+        vm.expectRevert(IKING.OnlyDepositors.selector);
+        king.deposit(_tokens, _amounts, owner);
     }
 
     function test_CannotDepositIfArrayLengthMismatch() public {
@@ -138,8 +138,8 @@ contract LRTSquaredDepositTest is LRTSquaredTestSetup {
         _amounts[1] = 50 * 10 ** tokenDecimals[1];
 
         vm.prank(alice);
-        vm.expectRevert(ILRTSquared.ArrayLengthMismatch.selector);
-        lrtSquared.deposit(_tokens, _amounts, alice);
+        vm.expectRevert(IKING.ArrayLengthMismatch.selector);
+        king.deposit(_tokens, _amounts, alice);
     }
 
     function test_CannotDepositIfRecipientAddress0() public {
@@ -152,8 +152,8 @@ contract LRTSquaredDepositTest is LRTSquaredTestSetup {
         _amounts[1] = 50 * 10 ** tokenDecimals[1];
 
         vm.prank(alice);
-        vm.expectRevert(ILRTSquared.InvalidRecipient.selector);
-        lrtSquared.deposit(_tokens, _amounts, address(0));
+        vm.expectRevert(IKING.InvalidRecipient.selector);
+        king.deposit(_tokens, _amounts, address(0));
     }
 
     function test_CannotDepositIfTokenNotRegistered() public {
@@ -166,8 +166,8 @@ contract LRTSquaredDepositTest is LRTSquaredTestSetup {
         _amounts[1] = 1;
 
         vm.prank(alice);
-        vm.expectRevert(ILRTSquared.TokenNotRegistered.selector);
-        lrtSquared.deposit(_tokens, _amounts, alice);
+        vm.expectRevert(IKING.TokenNotRegistered.selector);
+        king.deposit(_tokens, _amounts, alice);
     }
 
     function test_CannotDepositIfTokenNotWhitelisted() public {
@@ -182,8 +182,8 @@ contract LRTSquaredDepositTest is LRTSquaredTestSetup {
         _amounts[1] = 10 * 10 ** tokenDecimals[1];
 
         vm.prank(alice);
-        vm.expectRevert(ILRTSquared.TokenNotWhitelisted.selector);
-        lrtSquared.deposit(_tokens, _amounts, alice);
+        vm.expectRevert(IKING.TokenNotWhitelisted.selector);
+        king.deposit(_tokens, _amounts, alice);
     }
 
     function test_CannotDepositIfPriceIsZero() public {
@@ -196,7 +196,7 @@ contract LRTSquaredDepositTest is LRTSquaredTestSetup {
         _amounts[0] = 10 * 10 ** tokenDecimals[0];
 
         vm.prank(alice);
-        vm.expectRevert(ILRTSquared.PriceProviderFailed.selector);
-        lrtSquared.deposit(_tokens, _amounts, alice);
+        vm.expectRevert(IKING.PriceProviderFailed.selector);
+        king.deposit(_tokens, _amounts, alice);
     }
 }

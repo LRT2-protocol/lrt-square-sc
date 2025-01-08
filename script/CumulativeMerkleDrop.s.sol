@@ -7,7 +7,7 @@ import {Utils, ChainConfig} from "./Utils.sol";
 
 contract DeployCumulativeMerkleDrop is Utils {
     uint48 accessControlDelay = 120;
-    address lrt2 = 0x8F08B70456eb22f6109F57b8fafE862ED28E6040;
+    address king = 0x8F08B70456eb22f6109F57b8fafE862ED28E6040;
 
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -16,7 +16,7 @@ contract DeployCumulativeMerkleDrop is Utils {
 
         ChainConfig memory config = getChainConfig(vm.toString(block.chainid));
 
-        address cumulativeMerkleDropImpl = address(new CumulativeMerkleDrop(lrt2));
+        address cumulativeMerkleDropImpl = address(new CumulativeMerkleDrop(king));
         CumulativeMerkleDrop cumulativeMerkleDrop = CumulativeMerkleDrop(address(
             new UUPSProxy(
                 cumulativeMerkleDropImpl,

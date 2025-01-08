@@ -2,22 +2,22 @@
 pragma solidity ^0.8.25;
 
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ILRTSquared} from "../src/interfaces/ILRTSquared.sol";
-import {LRTSquaredStorage, Governable} from "../src/LRTSquared/LRTSquaredStorage.sol";
-import {LRTSquaredAdmin} from "../src/LRTSquared/LRTSquaredAdmin.sol";
-import {LRTSquaredInitializer} from "../src/LRTSquared/LRTSquaredInitializer.sol";
-import {LRTSquaredCore} from "../src/LRTSquared/LRTSquaredCore.sol";
+import {IKING} from "../src/interfaces/IKING.sol";
+import {KINGStorage, Governable} from "../src/KING/KINGStorage.sol";
+import {KINGAdmin} from "../src/KING/KINGAdmin.sol";
+import {KINGInitializer} from "../src/KING/KINGInitializer.sol";
+import {KINGCore} from "../src/KING/KINGCore.sol";
 import {UUPSProxy} from "../src/UUPSProxy.sol";
 import {PriceProvider} from "../src/PriceProvider.sol";
 import {Utils, ChainConfig} from "./Utils.sol";
 import {Swapper1InchV6} from "../src/Swapper1InchV6.sol";
 import {IAggregatorV3} from "../src/interfaces/IAggregatorV3.sol";
 
-contract DeployLRTSquared is Utils {
+contract DeployKING is Utils {
     using SafeERC20 for IERC20;
     
     string chainId;
-    ILRTSquared public lrtSquared;
+    IKING public king;
 
     address[] public tokens;
     PriceProvider public priceProvider;
@@ -34,7 +34,7 @@ contract DeployLRTSquared is Utils {
 
     uint128 percentageRateLimit = 10_000_000_000; // 1000%
     uint256 communityPauseDepositAmt = 4 ether;
-    LRTSquaredStorage.Fee fee;
+    KINGStorage.Fee fee;
 
     address depositor = 0xF46D3734564ef9a5a16fC3B1216831a28f78e2B5;
 
@@ -56,7 +56,7 @@ contract DeployLRTSquared is Utils {
 
         swapper = new Swapper1InchV6(swapRouter1InchV6);
 
-        fee = LRTSquaredStorage.Fee({
+        fee = KINGStorage.Fee({
             treasury: config.treasury,
             depositFeeInBps: config.depositFeeInBps,
             redeemFeeInBps: config.redeemFeeInBps
@@ -105,15 +105,15 @@ contract DeployLRTSquared is Utils {
             )
         );
 
-        address lrtSquaredCoreImpl = address(new LRTSquaredCore());
-        address lrtSquaredAdminImpl = address(new LRTSquaredAdmin());
-        address lrtSquaredInitializer = address(new LRTSquaredInitializer());
-        address lrtSquaredProxy = address(new UUPSProxy(lrtSquaredInitializer, ""));
-        lrtSquared = ILRTSquared(lrtSquaredProxy);
+        address kingCoreImpl = address(new KINGCore());
+        address kingAdminImpl = address(new KINGAdmin());
+        address kingInitializer = address(new KINGInitializer());
+        address kingProxy = address(new UUPSProxy(kingInitializer, ""));
+        king = IKING(kingProxy);
 
-        LRTSquaredInitializer(address(lrtSquared)).initialize(
-            "LRTSquared",
-            "LRT2",
+        KINGInitializer(address(king)).initialize(
+            "KING",
+            "KING2",
             deployer,
             pauser[0],
             rebalancer, 
@@ -124,31 +124,31 @@ contract DeployLRTSquared is Utils {
             fee
         );
 
-        LRTSquaredCore(address(lrtSquared)).upgradeToAndCall(lrtSquaredCoreImpl, "");
-        LRTSquaredCore(address(lrtSquared)).setAdminImpl(lrtSquaredAdminImpl);
+        KINGCore(address(king)).upgradeToAndCall(kingCoreImpl, "");
+        KINGCore(address(king)).setAdminImpl(kingAdminImpl);
 
-        lrtSquared.setPauser(pauser[1], true);
+        king.setPauser(pauser[1], true);
         
         tokens.pop();
         tokenPositionWeightLimits.pop();
 
         for (uint256 i = 0; i < tokens.length; ) {
-            lrtSquared.registerToken(tokens[i], tokenPositionWeightLimits[i]);
+            king.registerToken(tokens[i], tokenPositionWeightLimits[i]);
             unchecked {
                 ++i;
             }
         }
 
-        lrtSquared.transferGovernance(owner);
+        king.transferGovernance(owner);
 
         string memory parentObject = "parent object";
 
         string memory deployedAddresses = "addresses";
 
-        vm.serializeAddress(deployedAddresses, "lrtSquaredProxy", address(lrtSquared));
-        vm.serializeAddress(deployedAddresses, "lrtSquaredCore", lrtSquaredCoreImpl);
-        vm.serializeAddress(deployedAddresses, "lrtSquaredAdmin", lrtSquaredAdminImpl);
-        vm.serializeAddress(deployedAddresses, "lrtSquaredInitializer", lrtSquaredInitializer);
+        vm.serializeAddress(deployedAddresses, "kingProxy", address(king));
+        vm.serializeAddress(deployedAddresses, "kingCore", kingCoreImpl);
+        vm.serializeAddress(deployedAddresses, "kingAdmin", kingAdminImpl);
+        vm.serializeAddress(deployedAddresses, "kingInitializer", kingInitializer);
         vm.serializeAddress(deployedAddresses, "priceProvider", address(priceProvider));
         vm.serializeAddress(
             deployedAddresses,

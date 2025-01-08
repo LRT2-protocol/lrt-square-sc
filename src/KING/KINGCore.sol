@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredStorage, SafeERC20, IERC20, Math, BucketLimiter, IPriceProvider} from "./LRTSquaredStorage.sol";
+import {KINGStorage, SafeERC20, IERC20, Math, BucketLimiter, IPriceProvider} from "./KINGStorage.sol";
 
-contract LRTSquaredCore is LRTSquaredStorage {
+contract KINGCore is KINGStorage {
     using BucketLimiter for BucketLimiter.Limit;
     using SafeERC20 for IERC20;
     using Math for uint256;
@@ -196,7 +196,7 @@ contract LRTSquaredCore is LRTSquaredStorage {
     /// @notice Deposit rewards to the contract and mint share tokens to the recipient.
     /// @param _tokens addresses of ERC20 tokens to deposit
     /// @param amounts amounts of tokens to deposit
-    /// @param shareToMint amount of share token (= LRT^2 token) to mint
+    /// @param shareToMint amount of share token (= KING token) to mint
     /// @param depositFee fee to mint to the treasury 
     /// @param recipientForMintedShare recipient of the minted share token
     function _deposit(

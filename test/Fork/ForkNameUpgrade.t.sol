@@ -2,7 +2,7 @@
 // pragma solidity ^0.8.24;
 
 // import {Utils} from "../Utils.sol";
-// import {ILRTSquared} from "../../src/interfaces/ILRTSquared.sol";
+// import {IKING} from "../../src/interfaces/IKING.sol";
 // import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 // import {PriceProvider} from "../../src/PriceProvider.sol";
 // import {IAggregatorV3} from "../../src/interfaces/IAggregatorV3.sol";
@@ -19,31 +19,31 @@
 //     uint256 deadline;
 // }
 
-// contract ForkLRTSqaureNameUpgradeTest is Utils {
+// contract ForkKINGSqaureNameUpgradeTest is Utils {
 //     using SafeERC20 for IERC20;
 
-//     ILRTSquared lrtSquared = ILRTSquared(0x8F08B70456eb22f6109F57b8fafE862ED28E6040);
-//     string newName = "LRTSquared";
+//     IKING king = IKING(0x8F08B70456eb22f6109F57b8fafE862ED28E6040);
+//     string newName = "KING";
 //     function setUp() public {
 //         string memory mainnet = "https://eth-pokt.nodies.app";
 //         vm.createSelectFork(mainnet);
 
-//         address newImpl = address(new LRTSquared());
-//         vm.startPrank(lrtSquared.governor());
-//         lrtSquared.upgradeToAndCall(newImpl, "");
-//         lrtSquared.updateName(newName);
+//         address newImpl = address(new KING());
+//         vm.startPrank(king.governor());
+//         king.upgradeToAndCall(newImpl, "");
+//         king.updateName(newName);
 //         vm.stopPrank();
 //     }
 
 //     function test_Name() public view {
-//         assertEq(lrtSquared.name(), newName);
+//         assertEq(king.name(), newName);
 //     }
 
 //     function test_PermitName() public {
 //         bytes32 TYPE_HASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-//         bytes32 DOMAIN_SEPARATOR = keccak256(abi.encode(TYPE_HASH, keccak256(bytes(newName)), keccak256(bytes("2")), 1, address(lrtSquared)));
+//         bytes32 DOMAIN_SEPARATOR = keccak256(abi.encode(TYPE_HASH, keccak256(bytes(newName)), keccak256(bytes("2")), 1, address(king)));
 
-//         assertEq(lrtSquared.DOMAIN_SEPARATOR(), DOMAIN_SEPARATOR);
+//         assertEq(king.DOMAIN_SEPARATOR(), DOMAIN_SEPARATOR);
 
 //         uint256 amount = 10 ether;
 //         uint256 deadline = type(uint256).max;
@@ -61,9 +61,9 @@
 //         bytes32 digest = getTypedDataHash(DOMAIN_SEPARATOR, permit);
 //         (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePk, digest);
 
-//         lrtSquared.permit(permit.owner, permit.spender, permit.value, deadline, v, r, s);
+//         king.permit(permit.owner, permit.spender, permit.value, deadline, v, r, s);
 
-//         assertEq(lrtSquared.allowance(alice, bob), amount);
+//         assertEq(king.allowance(alice, bob), amount);
 //     }
 
 //     // computes the hash of the fully encoded EIP-712 message for the domain, which can be used to recover the signer

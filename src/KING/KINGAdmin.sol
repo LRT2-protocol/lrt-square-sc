@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredStorage, BucketLimiter, Math, SafeERC20, IERC20, IPriceProvider, ISwapper} from "./LRTSquaredStorage.sol";
+import {KINGStorage, BucketLimiter, Math, SafeERC20, IERC20, IPriceProvider, ISwapper} from "./KINGStorage.sol";
 import {BaseStrategy} from "../strategies/BaseStrategy.sol";
 
-contract LRTSquaredAdmin is LRTSquaredStorage {
+contract KINGAdmin is KINGStorage {
     using BucketLimiter for BucketLimiter.Limit;
     using SafeERC20 for IERC20;
     using Math for uint256;

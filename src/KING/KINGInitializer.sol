@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredStorage, BucketLimiter} from "./LRTSquaredStorage.sol";
+import {KINGStorage, BucketLimiter} from "./KINGStorage.sol";
 
-contract LRTSquaredInitializer is LRTSquaredStorage {
+contract KINGInitializer is KINGStorage {
     using BucketLimiter for BucketLimiter.Limit;
     
     function initialize(

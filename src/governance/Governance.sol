@@ -13,7 +13,7 @@ import {TimelockController} from "@openzeppelin/contracts/governance/TimelockCon
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 
-contract LRTSquaredGovernor is
+contract KINGGovernor is
     Governor,
     GovernorSettings,
     GovernorCountingSimple,
@@ -23,7 +23,7 @@ contract LRTSquaredGovernor is
     GovernorTimelockControl
 {
     constructor(IVotes _token, TimelockController _timelock)
-        Governor("LRT^2 Governance")
+        Governor("KING Governance")
         GovernorSettings(
             7200, /* ~1 day (86400 / 12 sec block time) */
             14416, /* ~2 days (86400 / 12 sec block time) * 2 */

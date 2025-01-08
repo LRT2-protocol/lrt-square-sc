@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredTestSetup, ILRTSquared, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
+import {KINGTestSetup, IKING, IERC20, SafeERC20} from "./KINGSetup.t.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-contract LRTSquaredBasicsTest is LRTSquaredTestSetup {
+contract KINGBasicsTest is KINGTestSetup {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -17,21 +17,21 @@ contract LRTSquaredBasicsTest is LRTSquaredTestSetup {
     }
 
     function test_Deploy() public {
-        assertEq(lrtSquared.isTokenRegistered(address(tokens[0])), true);
-        assertEq(lrtSquared.isTokenRegistered(address(tokens[1])), true);
-        assertEq(lrtSquared.isTokenRegistered(address(tokens[2])), true);
+        assertEq(king.isTokenRegistered(address(tokens[0])), true);
+        assertEq(king.isTokenRegistered(address(tokens[1])), true);
+        assertEq(king.isTokenRegistered(address(tokens[2])), true);
 
-        assertEq(lrtSquared.isTokenWhitelisted(address(tokens[0])), true);
-        assertEq(lrtSquared.isTokenWhitelisted(address(tokens[1])), true);
-        assertEq(lrtSquared.isTokenWhitelisted(address(tokens[2])), true);
+        assertEq(king.isTokenWhitelisted(address(tokens[0])), true);
+        assertEq(king.isTokenWhitelisted(address(tokens[1])), true);
+        assertEq(king.isTokenWhitelisted(address(tokens[2])), true);
 
-        assertEq(lrtSquared.totalSupply(), 0);
-        (uint256 tvl, uint256 tvlUsd) = lrtSquared.tvl();
+        assertEq(king.totalSupply(), 0);
+        (uint256 tvl, uint256 tvlUsd) = king.tvl();
         assertEq(tvl, 0);
         assertEq(tvlUsd, 0);
 
-        vm.expectRevert(ILRTSquared.TotalSupplyZero.selector);
-        lrtSquared.assetsForVaultShares(1);
+        vm.expectRevert(IKING.TotalSupplyZero.selector);
+        king.assetsForVaultShares(1);
 
         address[] memory _tokens = new address[](3);
         _tokens[0] = address(tokens[0]);
@@ -43,7 +43,7 @@ contract LRTSquaredBasicsTest is LRTSquaredTestSetup {
         (
             address[] memory _tokensFromContract,
             uint256[] memory _amountsFromContract
-        ) = lrtSquared.totalAssets();
+        ) = king.totalAssets();
         assertEq(_tokens, _tokensFromContract);
         assertEq(_amounts, _amountsFromContract);
     }
@@ -67,7 +67,7 @@ contract LRTSquaredBasicsTest is LRTSquaredTestSetup {
         );
 
         assertEq(
-            lrtSquared.getTokenValuesInEth(_tokens, _amounts),
+            king.getTokenValuesInEth(_tokens, _amounts),
             expectedTotal
         );
     }
@@ -80,8 +80,8 @@ contract LRTSquaredBasicsTest is LRTSquaredTestSetup {
         uint256[] memory _amounts = new uint256[](1);
         _amounts[0] = 1 * 10 ** tokenDecimals[0];
 
-        vm.expectRevert(ILRTSquared.ArrayLengthMismatch.selector);
-        lrtSquared.getTokenValuesInEth(_tokens, _amounts);
+        vm.expectRevert(IKING.ArrayLengthMismatch.selector);
+        king.getTokenValuesInEth(_tokens, _amounts);
     }
 
     function test_CannotGetTokenValuesInEthIfTokenNotRegistered() public {
@@ -91,8 +91,8 @@ contract LRTSquaredBasicsTest is LRTSquaredTestSetup {
         uint256[] memory _amounts = new uint256[](1);
         _amounts[0] = 1 ether;
 
-        vm.expectRevert(ILRTSquared.TokenNotRegistered.selector);
-        lrtSquared.getTokenValuesInEth(_tokens, _amounts);
+        vm.expectRevert(IKING.TokenNotRegistered.selector);
+        king.getTokenValuesInEth(_tokens, _amounts);
     }
 
     function test_PreviewDeposit() public {
@@ -117,7 +117,7 @@ contract LRTSquaredBasicsTest is LRTSquaredTestSetup {
         uint256 depositFee = expectedShares.mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
         expectedShares -= depositFee;
 
-        (uint256 sharesToMint, uint256 feeForDeposit) = lrtSquared.previewDeposit(_tokens, _amounts);
+        (uint256 sharesToMint, uint256 feeForDeposit) = king.previewDeposit(_tokens, _amounts);
 
         assertApproxEqAbs(
             sharesToMint,
@@ -145,7 +145,7 @@ contract LRTSquaredBasicsTest is LRTSquaredTestSetup {
         depositFee = expectedSharesAfterDeposit.mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
         expectedSharesAfterDeposit -= depositFee;
 
-        (sharesToMint, feeForDeposit) = lrtSquared.previewDeposit(_tokens, _amounts);
+        (sharesToMint, feeForDeposit) = king.previewDeposit(_tokens, _amounts);
 
 
         assertApproxEqAbs(
@@ -192,8 +192,8 @@ contract LRTSquaredBasicsTest is LRTSquaredTestSetup {
             _tokens[1]
         );
 
-        assertEq(lrtSquared.assetOf(alice, _tokens[0]), assetOfAliceInToken0);
-        assertEq(lrtSquared.assetOf(alice, _tokens[1]), assetOfAliceInToken1);
+        assertEq(king.assetOf(alice, _tokens[0]), assetOfAliceInToken0);
+        assertEq(king.assetOf(alice, _tokens[1]), assetOfAliceInToken1);
     }
 
     function test_AssetsOf() public {
@@ -214,7 +214,7 @@ contract LRTSquaredBasicsTest is LRTSquaredTestSetup {
         (
             address[] memory _tokensFromContract,
             uint256[] memory _amountsFromContract
-        ) = lrtSquared.assetsOf(alice);
+        ) = king.assetsOf(alice);
 
         address[] memory _expectedTokens = new address[](3);
         _expectedTokens[0] = address(tokens[_tokenIndices[0]]);
@@ -256,7 +256,7 @@ contract LRTSquaredBasicsTest is LRTSquaredTestSetup {
             _amounts
         );
 
-        (uint256 tvl, uint256 tvlUsd) = lrtSquared.tvl();
+        (uint256 tvl, uint256 tvlUsd) = king.tvl();
         (uint256 ethUsdPrice, uint8 ethUsdDecimals) = priceProvider.getEthUsdPrice();
         assertEq(tvl, totalValueInEth);
         assertEq(tvlUsd, (totalValueInEth * ethUsdPrice) / 10 ** ethUsdDecimals);
@@ -278,14 +278,14 @@ contract LRTSquaredBasicsTest is LRTSquaredTestSetup {
             deal(_tokens[i], alice, _amounts[i]);
 
             IERC20(_tokens[i]).safeIncreaseAllowance(
-                address(lrtSquared),
+                address(king),
                 _amounts[i]
             );
             unchecked {
                 ++i;
             }
         }
-        lrtSquared.deposit(_tokens, _amounts, _receiver);
+        king.deposit(_tokens, _amounts, _receiver);
         vm.stopPrank();
     }
 }

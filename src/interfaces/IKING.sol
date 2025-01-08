@@ -4,7 +4,7 @@ pragma solidity ^0.8.25;
 import {BucketLimiter} from "../libraries/BucketLimiter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-interface ILRTSquared is IERC20 {
+interface IKING is IERC20 {
     struct TokenInfo {
         bool registered;
         bool whitelisted;

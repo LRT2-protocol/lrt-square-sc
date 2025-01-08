@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredTestSetup, ILRTSquared} from "./LRTSquaredSetup.t.sol";
+import {KINGTestSetup, IKING} from "./KINGSetup.t.sol";
 
-contract LRTSquaredSetDepositorsTest is LRTSquaredTestSetup {
+contract KINGSetDepositorsTest is KINGTestSetup {
     function test_SetDepositorsWithGovernance() public {
         address depositor = makeAddr("depositor");
         address[] memory depositors = new address[](1);
@@ -12,9 +12,9 @@ contract LRTSquaredSetDepositorsTest is LRTSquaredTestSetup {
         bool[] memory isDepositor = new bool[](1);
         isDepositor[0] = true;
 
-        assertEq(lrtSquared.depositor(depositor), false);
+        assertEq(king.depositor(depositor), false);
         _setDepositors(depositors, isDepositor, hex"");
-        assertEq(lrtSquared.depositor(depositor), true);
+        assertEq(king.depositor(depositor), true);
     }
 
     function test_CannotSetDepositorIfAddressZero() public {
@@ -27,7 +27,7 @@ contract LRTSquaredSetDepositorsTest is LRTSquaredTestSetup {
         _setDepositors(
             depositors,
             isDepositor,
-            abi.encodeWithSelector(ILRTSquared.InvalidValue.selector)
+            abi.encodeWithSelector(IKING.InvalidValue.selector)
         );
     }
 
@@ -42,7 +42,7 @@ contract LRTSquaredSetDepositorsTest is LRTSquaredTestSetup {
         _setDepositors(
             depositors,
             isDepositor,
-            abi.encodeWithSelector(ILRTSquared.ArrayLengthMismatch.selector)
+            abi.encodeWithSelector(IKING.ArrayLengthMismatch.selector)
         );
     }
 }

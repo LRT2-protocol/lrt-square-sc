@@ -2,11 +2,11 @@
 pragma solidity ^0.8.25;
 
 contract Governable {
-    // keccak256("LRTSquare.governor");
+    // keccak256("KING.governor");
     bytes32 private constant governorPosition =
         0x7d8b90e89a676f7a8a3cf40a0c23c3d2ea61cec6ae800738fbd79bc111b5ea87;
 
-    // keccak256("LRTSquare.pending.governor");
+    // keccak256("KING.pending.governor");
     bytes32 private constant pendingGovernorPosition =
         0x0fe544e960ecab9b6f1eee0df869972d09c3c135c0d116422cce176351b52237;
 

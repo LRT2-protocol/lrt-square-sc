@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {ILRTSquared} from "../src/interfaces/ILRTSquared.sol";
+import {IKING} from "../src/interfaces/IKING.sol";
 import {Utils, ChainConfig} from "./Utils.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
-contract RebalanceLRTSquared is Utils {
+contract RebalanceKING is Utils {
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
         vm.startBroadcast(deployerPrivateKey);
 
         string memory deployments = readDeploymentFile();
-        ILRTSquared lrtSquared = ILRTSquared(stdJson.readAddress(
+        IKING king = IKING(stdJson.readAddress(
             deployments,
-            string.concat(".", "addresses", ".", "lrtSquaredProxy")
+            string.concat(".", "addresses", ".", "kingProxy")
         ));
 
         address swapper = stdJson.readAddress(
@@ -26,13 +26,13 @@ contract RebalanceLRTSquared is Utils {
         bytes memory quote = getQuoteOneInch(
             vm.toString(block.chainid),
             swapper,
-            address(lrtSquared),
+            address(king),
             config.eigen,
             WETH,
             1e18
         );
 
-        lrtSquared.rebalance(
+        king.rebalance(
             config.eigen,
             WETH,
             1e18,

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredTestSetup, ILRTSquared, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
+import {KINGTestSetup, IKING, IERC20, SafeERC20} from "./KINGSetup.t.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-contract LRTSquaredRedeemTest is LRTSquaredTestSetup {
+contract KINGRedeemTest is KINGTestSetup {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -51,7 +51,7 @@ contract LRTSquaredRedeemTest is LRTSquaredTestSetup {
             deal(_tokens[i], alice, _amounts[i]);
 
             IERC20(_tokens[i]).safeIncreaseAllowance(
-                address(lrtSquared),
+                address(king),
                 _amounts[i]
             );
             unchecked {
@@ -60,8 +60,8 @@ contract LRTSquaredRedeemTest is LRTSquaredTestSetup {
         }
 
         vm.expectEmit(true, true, true, true);
-        emit ILRTSquared.Deposit(alice, alice, sharesAlloted, fee, _tokens, _amounts);
-        lrtSquared.deposit(_tokens, _amounts, alice);
+        emit IKING.Deposit(alice, alice, sharesAlloted, fee, _tokens, _amounts);
+        king.deposit(_tokens, _amounts, alice);
         vm.stopPrank();
 
         // Since the amounts reduced by deposit fee bps
@@ -71,7 +71,7 @@ contract LRTSquaredRedeemTest is LRTSquaredTestSetup {
     }
 
     function test_Redeem() public {
-        uint256 aliceSharesBefore = lrtSquared.balanceOf(alice);
+        uint256 aliceSharesBefore = king.balanceOf(alice);
         uint256 aliceBalToken0Before = IERC20(_tokens[0]).balanceOf(alice);
         uint256 aliceBalToken1Before = IERC20(_tokens[1]).balanceOf(alice);
         uint256 aliceBalToken2Before = IERC20(_tokens[2]).balanceOf(alice);
@@ -81,10 +81,10 @@ contract LRTSquaredRedeemTest is LRTSquaredTestSetup {
         
         vm.prank(alice);
         vm.expectEmit(true, true, true, false);
-        emit ILRTSquared.Redeem(alice, burnShares, fee, _tokens, _amounts);
-        lrtSquared.redeem(sharesAlloted);
+        emit IKING.Redeem(alice, burnShares, fee, _tokens, _amounts);
+        king.redeem(sharesAlloted);
 
-        uint256 aliceSharesAfter = lrtSquared.balanceOf(alice);
+        uint256 aliceSharesAfter = king.balanceOf(alice);
         uint256 aliceBalToken0After = IERC20(_tokens[0]).balanceOf(alice);
         uint256 aliceBalToken1After = IERC20(_tokens[1]).balanceOf(alice);
         uint256 aliceBalToken2After = IERC20(_tokens[2]).balanceOf(alice);
@@ -110,7 +110,7 @@ contract LRTSquaredRedeemTest is LRTSquaredTestSetup {
 
     function test_CannotRedeemIfInsufficientShares() public {
         vm.prank(alice);
-        vm.expectRevert(ILRTSquared.InsufficientShares.selector);
-        lrtSquared.redeem(sharesAlloted + 1);
+        vm.expectRevert(IKING.InsufficientShares.selector);
+        king.redeem(sharesAlloted + 1);
     }
 }

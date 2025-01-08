@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredTestSetup, ILRTSquared} from "./LRTSquaredSetup.t.sol";
+import {KINGTestSetup, IKING} from "./KINGSetup.t.sol";
 
-contract LRTSquaredRegisterTokenTest is LRTSquaredTestSetup {
+contract KINGRegisterTokenTest is KINGTestSetup {
     function test_RegisterTokenWithGovernance() public {
-        assertEq(lrtSquared.isTokenRegistered(address(tokens[0])), false);
+        assertEq(king.isTokenRegistered(address(tokens[0])), false);
         _registerToken(address(tokens[0]), tokenPositionWeightLimits[0], hex"");
-        assertEq(lrtSquared.isTokenRegistered(address(tokens[0])), true);
+        assertEq(king.isTokenRegistered(address(tokens[0])), true);
     }
 
     function test_CannotRegisterTokenIfAddressZero() public {
         _registerToken(
             address(0),
             0,
-            abi.encodeWithSelector(ILRTSquared.InvalidValue.selector)
+            abi.encodeWithSelector(IKING.InvalidValue.selector)
         );
     }
 
@@ -24,7 +24,7 @@ contract LRTSquaredRegisterTokenTest is LRTSquaredTestSetup {
         _registerToken(
             address(tokens[0]),
             0,
-            abi.encodeWithSelector(ILRTSquared.TokenAlreadyRegistered.selector)
+            abi.encodeWithSelector(IKING.TokenAlreadyRegistered.selector)
         );
     }
 
@@ -35,7 +35,7 @@ contract LRTSquaredRegisterTokenTest is LRTSquaredTestSetup {
             address(tokens[0]),
             0,
             abi.encodeWithSelector(
-                ILRTSquared.PriceProviderNotConfigured.selector
+                IKING.PriceProviderNotConfigured.selector
             )
         );
     }
@@ -43,9 +43,9 @@ contract LRTSquaredRegisterTokenTest is LRTSquaredTestSetup {
     function test_CannotRegisterTokenIfMaxPercentageIsTooHigh() public {
         _registerToken(
             address(tokens[0]),
-            lrtSquared.HUNDRED_PERCENT_LIMIT() + 1,
+            king.HUNDRED_PERCENT_LIMIT() + 1,
             abi.encodeWithSelector(
-                ILRTSquared.WeightLimitCannotBeGreaterThanHundred.selector
+                IKING.WeightLimitCannotBeGreaterThanHundred.selector
             )
         );
     }

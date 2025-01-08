@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredTestSetup, ILRTSquared, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
+import {KINGTestSetup, IKING, IERC20, SafeERC20} from "./KINGSetup.t.sol";
 import {BucketLimiter} from "../../src/libraries/BucketLimiter.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Governable} from "../../src/governance/Governable.sol";
 
-contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
+contract KINGRateLimitTest is KINGTestSetup {
     using Math for uint256;
 
     uint256 initialDeposit = 100 ether;
-    ILRTSquared.RateLimit rateLimit;
+    IKING.RateLimit rateLimit;
     
     uint256[] assetIndices;
     address[] assets;
@@ -32,12 +32,12 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
         tokens[0].mint(owner, 1000000 ether);
 
         vm.startPrank(owner);
-        tokens[0].approve(address(lrtSquared), initialDeposit);
+        tokens[0].approve(address(king), initialDeposit);
         assetIndices.push(0);
         assets.push(address(tokens[0]));
         amounts.push(initialDeposit);
 
-        (uint256 sharesToMint, uint256 feeForDeposit) = lrtSquared.previewDeposit(assets, amounts);
+        (uint256 sharesToMint, uint256 feeForDeposit) = king.previewDeposit(assets, amounts);
         uint256 expectedShares = (amounts[0] * tokenPrices[0]) / 1 ether;
         uint256 depositFee = expectedShares.mulDiv(depositFeeInBps, HUNDRED_PERCENT_IN_BPS);
         expectedShares -= depositFee;
@@ -55,28 +55,28 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
         ); 
 
         // 100 ether * 0.1 ether / 1 ether = 10 ether worth
-        lrtSquared.deposit(assets, amounts, merkleDistributor);
-        // 10 ether LRT^2 == {tokens[0]: 100 ether}
+        king.deposit(assets, amounts, merkleDistributor);
+        // 10 ether KING == {tokens[0]: 100 ether}
 
-        (uint256 tvl, ) = lrtSquared.tvl();
+        (uint256 tvl, ) = king.tvl();
         assertApproxEqAbs(
             tvl,
             (amounts[0] * tokenPrices[0]) / 1 ether,
             1
         );
         assertEq(
-            lrtSquared.totalSupply(),
+            king.totalSupply(),
             100 * priceProvider.getPriceInEth(address(tokens[0]))
         ); // initial mint
         vm.stopPrank();
 
-        rateLimit = lrtSquared.getRateLimit();
+        rateLimit = king.getRateLimit();
     }
 
     function test_CanMintUpToRateLimit() public {
         uint256 amountEqualToTheRemaining = uint256(rateLimit.limit.remaining).mulDiv(1 ether, tokenPrices[0]);
         vm.startPrank(owner);
-        tokens[0].approve(address(lrtSquared), amountEqualToTheRemaining);
+        tokens[0].approve(address(king), amountEqualToTheRemaining);
         amounts[0] = amountEqualToTheRemaining;
 
         uint256 totalValueInEthAfterDeposit = _getTokenValuesInEth(
@@ -88,7 +88,7 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
         expectedSharesAfterDeposit -= fee;
 
         vm.expectEmit(true, true, true, true);
-        emit ILRTSquared.Deposit(
+        emit IKING.Deposit(
             owner,
             merkleDistributor,
             expectedSharesAfterDeposit,
@@ -96,23 +96,23 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
             assets,
             amounts
         );
-        lrtSquared.deposit(assets, amounts, merkleDistributor);
+        king.deposit(assets, amounts, merkleDistributor);
     }
 
     function test_CannotMintMoreThanRateLimit() public {
-        uint256 amountGreaterThanCapacity = initialDeposit * rateLimit.limit.capacity / lrtSquared.HUNDRED_PERCENT_LIMIT() + 1e12;
+        uint256 amountGreaterThanCapacity = initialDeposit * rateLimit.limit.capacity / king.HUNDRED_PERCENT_LIMIT() + 1e12;
         vm.startPrank(owner);
-        tokens[0].approve(address(lrtSquared), amountGreaterThanCapacity);
+        tokens[0].approve(address(king), amountGreaterThanCapacity);
         amounts[0] = amountGreaterThanCapacity;
 
-        vm.expectRevert(ILRTSquared.RateLimitExceeded.selector);
-        lrtSquared.deposit(assets, amounts, merkleDistributor);
+        vm.expectRevert(IKING.RateLimitExceeded.selector);
+        king.deposit(assets, amounts, merkleDistributor);
     }
 
     function test_BucketRefills() public {
         uint256 amountEqualToTheRemaining = uint256(rateLimit.limit.remaining).mulDiv(1 ether, tokenPrices[0]);
         vm.startPrank(owner);
-        tokens[0].approve(address(lrtSquared), amountEqualToTheRemaining);
+        tokens[0].approve(address(king), amountEqualToTheRemaining);
         amounts[0] = amountEqualToTheRemaining;
 
         uint256 totalValueInEthAfterDeposit = _getTokenValuesInEth(
@@ -124,7 +124,7 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
         expectedSharesAfterDeposit -= depositFee;
 
         vm.expectEmit(true, true, true, true);
-        emit ILRTSquared.Deposit(
+        emit IKING.Deposit(
             owner,
             merkleDistributor,
             expectedSharesAfterDeposit,
@@ -132,9 +132,9 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
             assets,
             amounts
         );
-        lrtSquared.deposit(assets, amounts, merkleDistributor);
+        king.deposit(assets, amounts, merkleDistributor);
 
-        rateLimit = lrtSquared.getRateLimit();
+        rateLimit = king.getRateLimit();
 
         assertEq(rateLimit.limit.remaining, 0);
 
@@ -142,7 +142,7 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
         uint256 expectedRefillAmtInTimePeriod = 10 * rateLimit.limit.refillRate;
         
         vm.warp(block.timestamp + timePeriod);
-        rateLimit = lrtSquared.getRateLimit();
+        rateLimit = king.getRateLimit();
 
         assertEq(rateLimit.limit.remaining, expectedRefillAmtInTimePeriod);
     }
@@ -151,7 +151,7 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
         uint64 newTimePeriod = 2 * 3600;
         _setRateLimitTimePeriod(newTimePeriod, hex"");
 
-        assertEq(lrtSquared.getRateLimit().timePeriod, newTimePeriod);
+        assertEq(king.getRateLimit().timePeriod, newTimePeriod);
     }
 
     function test_OnlyGovernorCanSetRateLimitTimePeriod() public {
@@ -159,14 +159,14 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
         address notGovernor = makeAddr("notGovernor");
         vm.prank(notGovernor);
         vm.expectRevert(Governable.OnlyGovernor.selector);
-        lrtSquared.setRateLimitTimePeriod(newTimePeriod);
+        king.setRateLimitTimePeriod(newTimePeriod);
     }
 
     function test_CanChangeRateLimitRefillRate() public {
         uint64 newRate = 1000;
         _setRateLimitRefillRate(newRate, hex"");
 
-        assertEq(lrtSquared.getRateLimit().limit.refillRate, newRate);
+        assertEq(king.getRateLimit().limit.refillRate, newRate);
     }
 
     function test_OnlyGovernorCanChangeRateLimitRefillRate() public {
@@ -175,7 +175,7 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
         address notGovernor = makeAddr("notGovernor");
         vm.prank(notGovernor);
         vm.expectRevert(Governable.OnlyGovernor.selector);
-        lrtSquared.setRefillRatePerSecond(newRate);
+        king.setRefillRatePerSecond(newRate);
     }
 
 
@@ -183,7 +183,7 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
         uint64 newPercentage = 100_000_000_000;
         _setPercentageRateLimit(newPercentage, hex"");
 
-        assertEq(lrtSquared.getRateLimit().percentageLimit, newPercentage);
+        assertEq(king.getRateLimit().percentageLimit, newPercentage);
     }
 
     function test_OnlyGovernorCanChangePercentageRateLimit() public {
@@ -192,7 +192,7 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
         address notGovernor = makeAddr("notGovernor");
         vm.prank(notGovernor);
         vm.expectRevert(Governable.OnlyGovernor.selector);
-        lrtSquared.setPercentageRateLimit(newPercentage);
+        king.setPercentageRateLimit(newPercentage);
     }
 
     function test_CanChangeRateLimitConfig() public {
@@ -202,9 +202,9 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
 
         _setRateLimitConfig(newPercentage, newTimePeriod, newRate, hex"");
 
-        assertEq(lrtSquared.getRateLimit().percentageLimit, newPercentage);
-        assertEq(lrtSquared.getRateLimit().limit.refillRate, newRate);
-        assertEq(lrtSquared.getRateLimit().timePeriod, newTimePeriod);
+        assertEq(king.getRateLimit().percentageLimit, newPercentage);
+        assertEq(king.getRateLimit().limit.refillRate, newRate);
+        assertEq(king.getRateLimit().timePeriod, newTimePeriod);
     }
 
     function test_OnlyGovernorCanChangeRateLimitConfig() public {
@@ -215,7 +215,7 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
         address notGovernor = makeAddr("notGovernor");
         vm.prank(notGovernor);
         vm.expectRevert(Governable.OnlyGovernor.selector);
-        lrtSquared.setRateLimitConfig(newPercentage, newTimePeriod, newRate);
+        king.setRateLimitConfig(newPercentage, newTimePeriod, newRate);
     }
 
     function test_CannotPrankTheRateLimit() public {
@@ -224,20 +224,20 @@ contract LRTSquaredRateLimitTest is LRTSquaredTestSetup {
         uint256 depositAmt = amountEqualToTheRemaining / 2; 
 
         vm.startPrank(owner);
-        tokens[0].approve(address(lrtSquared), depositAmt);
+        tokens[0].approve(address(king), depositAmt);
         amounts[0] = depositAmt;
-        lrtSquared.deposit(assets, amounts, merkleDistributor);
+        king.deposit(assets, amounts, merkleDistributor);
 
-        rateLimit = lrtSquared.getRateLimit();
+        rateLimit = king.getRateLimit();
 
         assertEq(rateLimit.limit.remaining, uint256(depositAmt).mulDiv(tokenPrices[0], 1 ether));
 
         depositAmt = depositAmt / 2; 
-        tokens[0].approve(address(lrtSquared), depositAmt);
+        tokens[0].approve(address(king), depositAmt);
         amounts[0] = depositAmt;
-        lrtSquared.deposit(assets, amounts, merkleDistributor);
+        king.deposit(assets, amounts, merkleDistributor);
 
-        rateLimit = lrtSquared.getRateLimit();
+        rateLimit = king.getRateLimit();
         assertEq(rateLimit.limit.remaining, uint256(depositAmt).mulDiv(tokenPrices[0], 1 ether));
         vm.stopPrank();
     }

@@ -15,17 +15,17 @@ import {ISwapper} from "../interfaces/ISwapper.sol";
 
 /*
     AVSs pay out rewards to stakers in their ERC20 tokens.
-    The LrtSquare contract consolidates AVS rewards into a single ERC20 token 
+    The KING contract consolidates AVS rewards into a single ERC20 token 
     It is designed to address the inefficiencies of collecting small, scattered rewards, 
     which can be costly and cumbersome for users. 
     
-    LrtSquare enables LRT protocols to deposit AVS rewards, issue share tokens to stakers, 
+    KING enables KING protocols to deposit AVS rewards, issue share tokens to stakers, 
     and allows users to redeem the underlying assets proportionate to their shares.
     This setup reduces transaction costs and simplifies the reward collection process, 
     benefiting users with smaller stakes who might prefer managing/trading their share tokens directly, 
     while larger holders have the option to redeem and potentially arbitrage.
 */
-contract LRTSquaredStorage is
+contract KINGStorage is
     Initializable,
     Governable,
     ERC20PermitUpgradeable,
@@ -92,7 +92,7 @@ contract LRTSquaredStorage is
     mapping (address token => StrategyConfig strategyConfig) public tokenStrategyConfig;
     // max slippage for strategy = 1% 
     uint256 public constant MAX_SLIPPAGE_FOR_STRATEGY_IN_BPS = 100;
-    // keccak256("LRTSquared.admin.impl");
+    // keccak256("KING.admin.impl");
     bytes32 constant adminImplPosition = 0x67f3bdb99ec85305417f06f626cf52c7dee7e44607664b5f1cce0af5d822472f;
 
     event TokenRegistered(address token);

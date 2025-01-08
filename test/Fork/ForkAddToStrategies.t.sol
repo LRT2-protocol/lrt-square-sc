@@ -4,7 +4,7 @@ pragma solidity ^0.8.25;
 import "forge-std/console.sol";
 import {Test} from "forge-std/Test.sol";
 import {GnosisHelpers} from "../../utils/GnosisHelpers.sol";
-import {ILRTSquared} from "../../src/interfaces/ILRTSquared.sol";
+import {IKING} from "../../src/interfaces/IKING.sol";
 import {PriceProvider} from "../../src/PriceProvider.sol";
 import {BoringVaultPriceProvider} from "../../src/BoringVaultPriceProvider.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -38,7 +38,7 @@ contract ForkAddToStrategies is Test, GnosisHelpers {
     address eigen = 0xec53bF9167f50cDEB3Ae105f56099aaaB9061F83;
     address ethFi = 0xFe0c30065B384F05761f15d0CC899D4F9F9Cc0eB;
 
-    address lrtSquared = 0x8F08B70456eb22f6109F57b8fafE862ED28E6040;
+    address king = 0x8F08B70456eb22f6109F57b8fafE862ED28E6040;
     address priceProvider = 0x2B90103cdc9Bba6c0dBCAaF961F0B5b1920F19E3;
 
     uint64 HUNDRED_PERCENT_LIMIT = 1_000_000_000;
@@ -80,30 +80,30 @@ contract ForkAddToStrategies is Test, GnosisHelpers {
         gnosisTx = string(abi.encodePacked(gnosisTx, _getGnosisTransaction(addressToHex(priceProvider), priceProviderSetConfig, false)));
 
         string memory registerSEthFiToken = iToHex(abi.encodeWithSignature("registerToken(address,uint64)", sEthFi, HUNDRED_PERCENT_LIMIT));
-        gnosisTx = string(abi.encodePacked(gnosisTx, _getGnosisTransaction(addressToHex(lrtSquared), registerSEthFiToken, false)));
+        gnosisTx = string(abi.encodePacked(gnosisTx, _getGnosisTransaction(addressToHex(king), registerSEthFiToken, false)));
         
         string memory registerEEigenToken = iToHex(abi.encodeWithSignature("registerToken(address,uint64)", eEigen, HUNDRED_PERCENT_LIMIT));
-        gnosisTx = string(abi.encodePacked(gnosisTx, _getGnosisTransaction(addressToHex(lrtSquared), registerEEigenToken, false)));
+        gnosisTx = string(abi.encodePacked(gnosisTx, _getGnosisTransaction(addressToHex(king), registerEEigenToken, false)));
         
-        ILRTSquared.StrategyConfig memory ethFiStrategyConfig = ILRTSquared.StrategyConfig({
+        IKING.StrategyConfig memory ethFiStrategyConfig = IKING.StrategyConfig({
             strategyAdapter: address(sEthFiStrategy),
             maxSlippageInBps: 1
         });
         string memory setEthFiStrategyConfig = iToHex(abi.encodeWithSignature("setTokenStrategyConfig(address,(address,uint96))", ethFi, ethFiStrategyConfig));
-        gnosisTx = string(abi.encodePacked(gnosisTx, _getGnosisTransaction(addressToHex(lrtSquared), setEthFiStrategyConfig, false)));
+        gnosisTx = string(abi.encodePacked(gnosisTx, _getGnosisTransaction(addressToHex(king), setEthFiStrategyConfig, false)));
 
-        ILRTSquared.StrategyConfig memory eigenStrategyConfig = ILRTSquared.StrategyConfig({
+        IKING.StrategyConfig memory eigenStrategyConfig = IKING.StrategyConfig({
             strategyAdapter: address(eEigenStrategy),
             maxSlippageInBps: 1
         });
         string memory setEigenStrategyConfig = iToHex(abi.encodeWithSignature("setTokenStrategyConfig(address,(address,uint96))", eigen, eigenStrategyConfig));
-        gnosisTx = string(abi.encodePacked(gnosisTx, _getGnosisTransaction(addressToHex(lrtSquared), setEigenStrategyConfig, true)));
+        gnosisTx = string(abi.encodePacked(gnosisTx, _getGnosisTransaction(addressToHex(king), setEigenStrategyConfig, true)));
 
         vm.createDir("./output", true);
         string memory path = "./output/AddStrategies.json";
         vm.writeFile(path, gnosisTx);
 
-        executeGnosisTransactionBundle(path, ILRTSquared(lrtSquared).governor());
+        executeGnosisTransactionBundle(path, IKING(king).governor());
 
         (uint256 price, uint8 decimals) = PriceProvider(priceProvider).getEthUsdPrice();
         console.log(PriceProvider(priceProvider).getPriceInEth(ethFi) * price / 1 ether);
@@ -117,26 +117,26 @@ contract ForkAddToStrategies is Test, GnosisHelpers {
 
         string memory gnosisTx = _getGnosisHeader(vm.toString(block.chainid));
         
-        (uint256 totalValue, uint256 totalValueInUsd)= ILRTSquared(lrtSquared).tvl();
+        (uint256 totalValue, uint256 totalValueInUsd)= IKING(king).tvl();
         console.log(totalValue, totalValueInUsd);
 
         uint256 percentage = 25;
 
-        uint256 ethfi_admount = IERC20(ethFi).balanceOf(lrtSquared) * percentage / 100;
+        uint256 ethfi_admount = IERC20(ethFi).balanceOf(king) * percentage / 100;
         string memory depositEthFiToStrategy = iToHex(abi.encodeWithSignature("depositToStrategy(address,uint256)", ethFi, ethfi_admount));
-        gnosisTx = string(abi.encodePacked(gnosisTx, _getGnosisTransaction(addressToHex(lrtSquared), depositEthFiToStrategy, false)));
+        gnosisTx = string(abi.encodePacked(gnosisTx, _getGnosisTransaction(addressToHex(king), depositEthFiToStrategy, false)));
 
-        uint256 eigen_admount = IERC20(eigen).balanceOf(lrtSquared) * percentage / 100;
+        uint256 eigen_admount = IERC20(eigen).balanceOf(king) * percentage / 100;
         string memory depositEigenToStrategy = iToHex(abi.encodeWithSignature("depositToStrategy(address,uint256)", eigen, eigen_admount));
-        gnosisTx = string(abi.encodePacked(gnosisTx, _getGnosisTransaction(addressToHex(lrtSquared), depositEigenToStrategy, true)));
+        gnosisTx = string(abi.encodePacked(gnosisTx, _getGnosisTransaction(addressToHex(king), depositEigenToStrategy, true)));
 
         vm.createDir("./output", true);
         string memory path = "./output/DepositToStrategies.json";
         vm.writeFile(path, gnosisTx);
 
-        executeGnosisTransactionBundle(path, ILRTSquared(lrtSquared).governor());
+        executeGnosisTransactionBundle(path, IKING(king).governor());
 
-        (totalValue, totalValueInUsd)= ILRTSquared(lrtSquared).tvl();
+        (totalValue, totalValueInUsd)= IKING(king).tvl();
         console.log(totalValue, totalValueInUsd);
     }
 }

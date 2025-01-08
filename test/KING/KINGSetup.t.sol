@@ -4,15 +4,15 @@ pragma solidity ^0.8.25;
 import {Utils} from "../Utils.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
-import {ILRTSquared} from "../../src/interfaces/ILRTSquared.sol";
-import {LRTSquaredStorage, Governable} from "../../src/LRTSquared/LRTSquaredStorage.sol";
-import {LRTSquaredAdmin} from "../../src/LRTSquared/LRTSquaredAdmin.sol";
-import {LRTSquaredInitializer} from "../../src/LRTSquared/LRTSquaredInitializer.sol";
-import {LRTSquaredCore} from "../../src/LRTSquared/LRTSquaredCore.sol";
+import {IKING} from "../../src/interfaces/IKING.sol";
+import {KINGStorage, Governable} from "../../src/KING/KINGStorage.sol";
+import {KINGAdmin} from "../../src/KING/KINGAdmin.sol";
+import {KINGInitializer} from "../../src/KING/KINGInitializer.sol";
+import {KINGCore} from "../../src/KING/KINGCore.sol";
 import {UUPSProxy} from "src/UUPSProxy.sol";
 import {MockPriceProvider} from "../../src/mocks/MockPriceProvider.sol";
 import {GovernanceToken} from "../../src/governance/GovernanceToken.sol";
-import {LRTSquaredGovernor} from "../../src/governance/Governance.sol";
+import {KINGGovernor} from "../../src/governance/Governance.sol";
 import {Timelock} from "../../src/governance/Timelock.sol";
 import {MockERC20} from "../../src/mocks/MockERC20.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
@@ -31,12 +31,12 @@ interface IPriceProvider {
     function setPrice(address token, uint256 price) external;
 }
 
-contract LRTSquaredTestSetup is Utils {
+contract KINGTestSetup is Utils {
     using SafeERC20 for IERC20;
 
     address pauser = makeAddr("pauser");
     address treasury = makeAddr("treasury");
-    ILRTSquared public lrtSquared;
+    IKING public king;
 
     MockERC20[] public tokens;
     IPriceProvider public priceProvider;
@@ -51,7 +51,7 @@ contract LRTSquaredTestSetup is Utils {
     address public merkleDistributor = vm.addr(1000);
 
     GovernanceToken govToken;
-    LRTSquaredGovernor governance;
+    KINGGovernor governance;
     Timelock timelock;
 
     uint256[] tokenPrices;
@@ -72,7 +72,7 @@ contract LRTSquaredTestSetup is Utils {
         address admin = owner;
         govToken = new GovernanceToken("GovToken", "GTK", totalSupply);
         timelock = new Timelock(proposers, executors, admin);
-        governance = new LRTSquaredGovernor(IVotes(address(govToken)), timelock);
+        governance = new KINGGovernor(IVotes(address(govToken)), timelock);
 
         timelock.grantRole(timelock.PROPOSER_ROLE(), address(governance));
         timelock.grantRole(timelock.EXECUTOR_ROLE(), address(0));
@@ -104,21 +104,21 @@ contract LRTSquaredTestSetup is Utils {
         tokens[1].mint(owner, 100 ether);
         tokens[2].mint(owner, 100 ether);
 
-        LRTSquaredStorage.Fee memory fee = LRTSquaredStorage.Fee({
+        KINGStorage.Fee memory fee = KINGStorage.Fee({
             treasury: treasury,
             depositFeeInBps: depositFeeInBps,
             redeemFeeInBps: redeemFeeInBps
         });
 
-        address lrtSquaredCoreImpl = address(new LRTSquaredCore());
-        address lrtSquaredAdminImpl = address(new LRTSquaredAdmin());
-        address lrtSquaredInitializer = address(new LRTSquaredInitializer());
-        address lrtSquaredProxy = address(new UUPSProxy(lrtSquaredInitializer, ""));
-        lrtSquared = ILRTSquared(lrtSquaredProxy);
+        address kingCoreImpl = address(new KINGCore());
+        address kingAdminImpl = address(new KINGAdmin());
+        address kingInitializer = address(new KINGInitializer());
+        address kingProxy = address(new UUPSProxy(kingInitializer, ""));
+        king = IKING(kingProxy);
 
-        LRTSquaredInitializer(address(lrtSquared)).initialize(
-            "LRTSquared",
-            "LRT2",
+        KINGInitializer(address(king)).initialize(
+            "KING",
+            "KING2",
             address(timelock),
             pauser,
             rebalancer, 
@@ -131,9 +131,9 @@ contract LRTSquaredTestSetup is Utils {
         vm.stopPrank();
 
         vm.startPrank(address(timelock));
-        LRTSquaredCore(address(lrtSquared)).upgradeToAndCall(lrtSquaredCoreImpl, "");
-        LRTSquaredCore(address(lrtSquared)).setAdminImpl(lrtSquaredAdminImpl);
-        lrtSquared.updatePriceProvider(address(priceProvider));
+        KINGCore(address(king)).upgradeToAndCall(kingCoreImpl, "");
+        KINGCore(address(king)).setAdminImpl(kingAdminImpl);
+        king.updatePriceProvider(address(priceProvider));
         vm.stopPrank();
     }
 
@@ -148,7 +148,7 @@ contract LRTSquaredTestSetup is Utils {
         );
 
         bytes memory data = abi.encodeWithSelector(
-            ILRTSquared.registerToken.selector,
+            IKING.registerToken.selector,
             token,
             tokenMaxPercentage
         );
@@ -172,7 +172,7 @@ contract LRTSquaredTestSetup is Utils {
             )
         );
         bytes memory data = abi.encodeWithSelector(
-            ILRTSquared.updateWhitelist.selector,
+            IKING.updateWhitelist.selector,
             token,
             whitelist
         );
@@ -193,7 +193,7 @@ contract LRTSquaredTestSetup is Utils {
             )
         );
         bytes memory data = abi.encodeWithSelector(
-            ILRTSquared.updatePriceProvider.selector,
+            IKING.updatePriceProvider.selector,
             _priceProvider
         );
 
@@ -208,7 +208,7 @@ contract LRTSquaredTestSetup is Utils {
         string memory description = "Proposal: Set depositors";
 
         bytes memory data = abi.encodeWithSelector(
-            ILRTSquared.setDepositors.selector,
+            IKING.setDepositors.selector,
             depositors,
             isDepositor
         );
@@ -229,7 +229,7 @@ contract LRTSquaredTestSetup is Utils {
         );
 
         bytes memory data = abi.encodeWithSelector(
-            ILRTSquared.updateTokenPositionWeightLimit.selector,
+            IKING.updateTokenPositionWeightLimit.selector,
             token,
             maxPercentage
         );
@@ -244,7 +244,7 @@ contract LRTSquaredTestSetup is Utils {
         string memory description = "Proposal: Set rate limit refill rate";
 
         bytes memory data = abi.encodeWithSelector(
-            ILRTSquared.setRefillRatePerSecond.selector,
+            IKING.setRefillRatePerSecond.selector,
             refillRate
         );
 
@@ -258,7 +258,7 @@ contract LRTSquaredTestSetup is Utils {
         string memory description = "Proposal: Set rate limit time period";
 
         bytes memory data = abi.encodeWithSelector(
-            ILRTSquared.setRateLimitTimePeriod.selector,
+            IKING.setRateLimitTimePeriod.selector,
             timePeriod
         );
 
@@ -272,7 +272,7 @@ contract LRTSquaredTestSetup is Utils {
         string memory description = "Proposal: Set rate limit percentage";
 
         bytes memory data = abi.encodeWithSelector(
-            ILRTSquared.setPercentageRateLimit.selector,
+            IKING.setPercentageRateLimit.selector,
             percentageLimit
         );
 
@@ -288,7 +288,7 @@ contract LRTSquaredTestSetup is Utils {
         string memory description = "Proposal: Set rate limit config";
 
         bytes memory data = abi.encodeWithSelector(
-            ILRTSquared.setRateLimitConfig.selector,
+            IKING.setRateLimitConfig.selector,
             __percentageLimit,
             __timePeriod, 
             __refillRate
@@ -307,7 +307,7 @@ contract LRTSquaredTestSetup is Utils {
         bytes[] memory calldatas = new bytes[](1);
         bytes32 descriptionHash = keccak256(bytes(description));
 
-        targets[0] = address(lrtSquared);
+        targets[0] = address(king);
         values[0] = 0;
         calldatas[0] = data;
 
@@ -379,15 +379,15 @@ contract LRTSquaredTestSetup is Utils {
         address asset
     ) internal view returns (uint256) {
         return
-            (vaultShare * (IERC20(asset).balanceOf(address(lrtSquared)) + 1)) /
-            (lrtSquared.totalSupply() + 1);
+            (vaultShare * (IERC20(asset).balanceOf(address(king)) + 1)) /
+            (king.totalSupply() + 1);
     }
 
     function _getSharesForEth(
         uint256 valueInEth
     ) internal view returns (uint256) {
-        uint256 _totalSupply = lrtSquared.totalSupply();
-        (uint256 _vaultTokenValuesInEth, ) = lrtSquared.fairValueOf(
+        uint256 _totalSupply = king.totalSupply();
+        (uint256 _vaultTokenValuesInEth, ) = king.fairValueOf(
             _totalSupply
         );
 

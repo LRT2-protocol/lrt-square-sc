@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {LRTSquaredTestSetup, IPriceProvider, ILRTSquared, IERC20, SafeERC20} from "./LRTSquaredSetup.t.sol";
+import {KINGTestSetup, IPriceProvider, IKING, IERC20, SafeERC20} from "./KINGSetup.t.sol";
 import {Swapper1InchV6} from "../../src/Swapper1InchV6.sol";
 import {PriceProvider} from "../../src/PriceProvider.sol";
 import {IAggregatorV3} from "../../src/interfaces/IAggregatorV3.sol";
@@ -13,7 +13,7 @@ interface IWeETH {
     function getEETHByWeETH(uint256 _weETHAmoun) external view returns (uint256);
 }
 
-contract LRTSquaredRebalanceTest is LRTSquaredTestSetup {
+contract KINGRebalanceTest is KINGTestSetup {
     using SafeERC20 for IERC20;
 
     Swapper1InchV6 swapper1Inch;
@@ -110,18 +110,18 @@ contract LRTSquaredRebalanceTest is LRTSquaredTestSetup {
         bool[] memory isDepositor = new bool[](1);
         isDepositor[0] = true;
 
-        lrtSquared.setDepositors(depositors, isDepositor); 
-        lrtSquared.updatePriceProvider(address(oracle));
-        lrtSquared.registerToken(assets[0], lrtSquared.HUNDRED_PERCENT_LIMIT());
-        lrtSquared.registerToken(assets[1], lrtSquared.HUNDRED_PERCENT_LIMIT());
-        lrtSquared.setSwapper(address(swapper1Inch));
+        king.setDepositors(depositors, isDepositor); 
+        king.updatePriceProvider(address(oracle));
+        king.registerToken(assets[0], king.HUNDRED_PERCENT_LIMIT());
+        king.registerToken(assets[1], king.HUNDRED_PERCENT_LIMIT());
+        king.setSwapper(address(swapper1Inch));
 
         vm.stopPrank();
     }
 
     function test_CanRebalance() public {
         vm.prank(rebalancer);
-        lrtSquared.setMaxSlippageForRebalancing(0.9 ether); // 10% slippage so swap does not fail
+        king.setMaxSlippageForRebalancing(0.9 ether); // 10% slippage so swap does not fail
 
         deal(address(weETH), alice, 1 ether);
 
@@ -133,17 +133,17 @@ contract LRTSquaredRebalanceTest is LRTSquaredTestSetup {
         uint256[] memory _amounts = new uint256[](1);
         _amounts[0] = depositAmt;
 
-        IERC20(weETH).safeIncreaseAllowance(address(lrtSquared), depositAmt);
-        lrtSquared.deposit(_tokens, _amounts, alice);
+        IERC20(weETH).safeIncreaseAllowance(address(king), depositAmt);
+        king.deposit(_tokens, _amounts, alice);
 
         vm.stopPrank();
 
         // Rebalance funds to include some BTC 
         vm.prank(address(timelock));
-        lrtSquared.whitelistRebalacingOutputToken(btc, true);
+        king.whitelistRebalacingOutputToken(btc, true);
 
-        uint256 vaultWeEthBalBefore = IERC20(weETH).balanceOf(address(lrtSquared));
-        uint256 vaultBtcBalBefore = IERC20(btc).balanceOf(address(lrtSquared));
+        uint256 vaultWeEthBalBefore = IERC20(weETH).balanceOf(address(king));
+        uint256 vaultBtcBalBefore = IERC20(btc).balanceOf(address(king));
 
         assertEq(vaultWeEthBalBefore, depositAmt);
         assertEq(vaultBtcBalBefore, 0);
@@ -152,17 +152,17 @@ contract LRTSquaredRebalanceTest is LRTSquaredTestSetup {
         bytes memory swapData = getQuoteOneInch(
             vm.toString(block.chainid),
             address(swapper),
-            address(lrtSquared),
+            address(king),
             address(weETH),
             address(btc),
             rebalanceAmount
         );
 
         vm.prank(rebalancer);
-        lrtSquared.rebalance(weETH, btc, rebalanceAmount, 1, swapData);
+        king.rebalance(weETH, btc, rebalanceAmount, 1, swapData);
 
-        uint256 vaultWeEthBalAfter = IERC20(weETH).balanceOf(address(lrtSquared));
-        uint256 vaultBtcBalAfter = IERC20(btc).balanceOf(address(lrtSquared));
+        uint256 vaultWeEthBalAfter = IERC20(weETH).balanceOf(address(king));
+        uint256 vaultBtcBalAfter = IERC20(btc).balanceOf(address(king));
        
         assertEq(vaultWeEthBalAfter, depositAmt - rebalanceAmount);
         assertGt(vaultBtcBalAfter, 0);
@@ -171,103 +171,103 @@ contract LRTSquaredRebalanceTest is LRTSquaredTestSetup {
     function test_OnlyGovernorCanSetRebalancer() public {
         vm.prank(alice);
         vm.expectRevert(Governable.OnlyGovernor.selector);
-        lrtSquared.setRebalancer(alice);
+        king.setRebalancer(alice);
 
         vm.startPrank(address(timelock));
         vm.expectEmit(true, true, true, true);
-        emit ILRTSquared.RebalancerSet(lrtSquared.rebalancer(), alice);
-        lrtSquared.setRebalancer(alice);
-        assertEq(lrtSquared.rebalancer(), alice);
+        emit IKING.RebalancerSet(king.rebalancer(), alice);
+        king.setRebalancer(alice);
+        assertEq(king.rebalancer(), alice);
         vm.stopPrank();
     }
 
     function test_RebalancerCannotBeAddressZero() public {
         vm.prank(address(timelock));
-        vm.expectRevert(ILRTSquared.InvalidValue.selector);
-        lrtSquared.setRebalancer(address(0));
+        vm.expectRevert(IKING.InvalidValue.selector);
+        king.setRebalancer(address(0));
     }
 
     function test_OnlyRebalancerCanSetMaxSlippage() public {
         uint256 newMaxSlippage = 1 ether;
         vm.prank(alice);
-        vm.expectRevert(ILRTSquared.OnlyRebalancer.selector);
-        lrtSquared.setMaxSlippageForRebalancing(newMaxSlippage);
+        vm.expectRevert(IKING.OnlyRebalancer.selector);
+        king.setMaxSlippageForRebalancing(newMaxSlippage);
 
         vm.startPrank(rebalancer);
         vm.expectEmit(true, true, true, true);
-        emit ILRTSquared.MaxSlippageForRebalanceSet(lrtSquared.maxSlippageForRebalancing(), newMaxSlippage);
-        lrtSquared.setMaxSlippageForRebalancing(newMaxSlippage);
-        assertEq(lrtSquared.maxSlippageForRebalancing(), newMaxSlippage);
+        emit IKING.MaxSlippageForRebalanceSet(king.maxSlippageForRebalancing(), newMaxSlippage);
+        king.setMaxSlippageForRebalancing(newMaxSlippage);
+        assertEq(king.maxSlippageForRebalancing(), newMaxSlippage);
         vm.stopPrank();
     }
 
     function test_MaxSlippageCannotBeZero() public {
         vm.prank(rebalancer);
-        vm.expectRevert(ILRTSquared.InvalidValue.selector);
-        lrtSquared.setMaxSlippageForRebalancing(0);
+        vm.expectRevert(IKING.InvalidValue.selector);
+        king.setMaxSlippageForRebalancing(0);
     }
 
     function test_OnlyGovernorCanWhitelistRebalanceOutputTokens() public {
         vm.prank(alice);
         vm.expectRevert(Governable.OnlyGovernor.selector);
-        lrtSquared.whitelistRebalacingOutputToken(weETH, true);
+        king.whitelistRebalacingOutputToken(weETH, true);
         
         vm.prank(address(timelock));
         vm.expectEmit(true, true, true, true);
-        emit ILRTSquared.WhitelistRebalanceOutputToken(weETH, true);
-        lrtSquared.whitelistRebalacingOutputToken(weETH, true);
-        assertEq(lrtSquared.isWhitelistedRebalanceOutputToken(weETH), true);
+        emit IKING.WhitelistRebalanceOutputToken(weETH, true);
+        king.whitelistRebalacingOutputToken(weETH, true);
+        assertEq(king.isWhitelistedRebalanceOutputToken(weETH), true);
     }
 
     function test_CannotWhitelistAddressZeroAsRebalanceOutputToken() public {
         vm.prank(address(timelock));
-        vm.expectRevert(ILRTSquared.InvalidValue.selector);
-        lrtSquared.whitelistRebalacingOutputToken(address(0), true);
+        vm.expectRevert(IKING.InvalidValue.selector);
+        king.whitelistRebalacingOutputToken(address(0), true);
     }
 
     function test_CannotWhitelistAsRebalanceOutputTokenIfTokenNotRegistered() public {
         vm.prank(address(timelock));
-        vm.expectRevert(ILRTSquared.TokenNotRegistered.selector);
-        lrtSquared.whitelistRebalacingOutputToken(address(1), true);
+        vm.expectRevert(IKING.TokenNotRegistered.selector);
+        king.whitelistRebalacingOutputToken(address(1), true);
     }
 
     function test_CannotWhitelistAsRebalanceOutputTokenIfPriceNotConfigured() public {
         // set mock price provider which does not have weETH price
         vm.prank(address(timelock));
-        lrtSquared.updatePriceProvider(address(priceProvider));
+        king.updatePriceProvider(address(priceProvider));
 
         vm.prank(address(timelock));
-        vm.expectRevert(ILRTSquared.PriceProviderNotConfigured.selector);
-        lrtSquared.whitelistRebalacingOutputToken(weETH, true);
+        vm.expectRevert(IKING.PriceProviderNotConfigured.selector);
+        king.whitelistRebalacingOutputToken(weETH, true);
     }
 
     function test_CannotRebalanceIfInputTokenNotRegistered() public {
         vm.prank(rebalancer);
-        vm.expectRevert(ILRTSquared.TokenNotRegistered.selector);
-        lrtSquared.rebalance(address(1), btc, 1, 1, hex"");
+        vm.expectRevert(IKING.TokenNotRegistered.selector);
+        king.rebalance(address(1), btc, 1, 1, hex"");
     }
 
     function test_CannotRebalanceIfOutputTokenNotRegistered() public {
         vm.prank(rebalancer);
-        vm.expectRevert(ILRTSquared.TokenNotRegistered.selector);
-        lrtSquared.rebalance(weETH, address(1), 1, 1, hex"");
+        vm.expectRevert(IKING.TokenNotRegistered.selector);
+        king.rebalance(weETH, address(1), 1, 1, hex"");
     }
 
     function test_CannotRebalanceIfOutputTokenNotWhitelisted() public {
         vm.prank(address(timelock));
-        lrtSquared.updateWhitelist(btc, false);
+        king.updateWhitelist(btc, false);
 
         vm.prank(rebalancer);
-        vm.expectRevert(ILRTSquared.TokenNotWhitelisted.selector);
-        lrtSquared.rebalance(weETH, btc, 1, 1, hex"");
+        vm.expectRevert(IKING.TokenNotWhitelisted.selector);
+        king.rebalance(weETH, btc, 1, 1, hex"");
     }
 
     function test_CannotRebalanceIfOutputTokenIsNotARegisteredValidOutputToken() public {
         vm.prank(address(timelock));
-        lrtSquared.whitelistRebalacingOutputToken(btc, false);
+        king.whitelistRebalacingOutputToken(btc, false);
 
         vm.prank(rebalancer);
-        vm.expectRevert(ILRTSquared.NotAValidRebalanceOutputToken.selector);
-        lrtSquared.rebalance(weETH, btc, 1, 1, hex"");
+        vm.expectRevert(IKING.NotAValidRebalanceOutputToken.selector);
+        king.rebalance(weETH, btc, 1, 1, hex"");
     }
 }
