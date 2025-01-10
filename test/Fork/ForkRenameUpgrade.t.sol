@@ -55,7 +55,7 @@ contract ForkRenameUpgrade is Utils {
             revert(reason);
         }
 
-        string memory newName = "KINGToken";
+        string memory newName = "King Protocol";
         string memory newSymbol = "KING";
 
         try LRTSquaredDummy(address(lrtSquared)).setInfo(newName, newSymbol) {
@@ -86,7 +86,7 @@ contract ForkRenameUpgrade is Utils {
 
         //Check new name and symbol
         assertEq("KING", lrtSquaredToken.symbol());
-        assertEq("KINGToken", lrtSquaredToken.name());
+        assertEq("King Protocol", lrtSquaredToken.name());
 
         //Check TVL or other state variables remain the same
         (uint256 newTvl,) = lrtSquared.tvl();

@@ -25,7 +25,7 @@ async function rename() {
 
   const setInfoData = dummyIface.encodeFunctionData(
     "setInfo",
-    ["KINGToken", "KING"]
+    ["King Protocol", "KING"]
   );
 
   await propose(LRT_SQUARED_PROXY, setInfoData, "0");
