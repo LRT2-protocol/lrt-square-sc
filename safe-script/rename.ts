@@ -1,7 +1,7 @@
 import { ethers } from "ethers";
-import { propose } from "./propose";
+import { proposeBatch } from "./proposeBatch";
 
-async function rename() {
+export async function rename() {
   const LRT_SQUARED_PROXY = "0x8F08B70456eb22f6109F57b8fafE862ED28E6040";
 
   const LRT_SQUARED_DUMMY_IMPL = "";
@@ -19,22 +19,38 @@ async function rename() {
 
   const upgradeToDummyData = adminIface.encodeFunctionData(
     "upgradeToAndCall",
-    [LRT_SQUARED_DUMMY_IMPL, "0x"] 
+    [LRT_SQUARED_DUMMY_IMPL, "0x"]
   );
-  await propose(LRT_SQUARED_PROXY, upgradeToDummyData, "0");
 
   const setInfoData = dummyIface.encodeFunctionData(
     "setInfo",
     ["King Protocol", "KING"]
   );
 
-  await propose(LRT_SQUARED_PROXY, setInfoData, "0");
-
   const upgradeToCoreData = adminIface.encodeFunctionData(
     "upgradeToAndCall",
     [LRT_SQUARED_CORE_IMPL, "0x"]
   );
-  await propose(LRT_SQUARED_PROXY, upgradeToCoreData, "0");
+
+  const transactions = [
+    {
+      to: LRT_SQUARED_PROXY,
+      data: upgradeToDummyData,
+      value: "0"
+    },
+    {
+      to: LRT_SQUARED_PROXY,
+      data: setInfoData,
+      value: "0"
+    },
+    {
+      to: LRT_SQUARED_PROXY,
+      data: upgradeToCoreData,
+      value: "0"
+    }
+  ];
+
+  await proposeBatch(transactions);
 }
 
 rename().catch((err) => {
