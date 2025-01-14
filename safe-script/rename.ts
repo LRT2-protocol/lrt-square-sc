@@ -4,7 +4,7 @@ import { proposeBatch } from "./proposeBatch";
 export async function rename() {
   const LRT_SQUARED_PROXY = "0x8F08B70456eb22f6109F57b8fafE862ED28E6040";
 
-  const LRT_SQUARED_DUMMY_IMPL = "";
+  const LRT_SQUARED_DUMMY_IMPL = "0x8E029cEDC7Daf4d9cFFe56AC6771dE266F3CCAdc";
   const LRT_SQUARED_CORE_IMPL  = "0x3D987E04fC47ac625F720f169C658307fd9A16A2";
 
   const adminAbi = [
