@@ -4,9 +4,7 @@ pragma solidity ^0.8.24;
 import {Script} from "forge-std/Script.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
-
 contract GnosisHelpers is Script {
-
     /**
      * @dev Simulations the execution of a gnosis transaction bundle on the current fork
      * @param transactionPath The path to the transaction bundle json file
