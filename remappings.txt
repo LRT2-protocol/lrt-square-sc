@@ -1,2 +1,7 @@
-@openzeppelin/=lib/openzeppelin-contracts/
-@openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/
+@openzeppelin/contracts=node_modules/@openzeppelin/contracts/
+@openzeppelin-upgradeable/contracts=node_modules/@openzeppelin/contracts-upgradeable/
+@openzeppelin/contracts-upgradeable=node_modules/@openzeppelin/contracts-upgradeable/
+@layerzerolabs/lz-evm-oapp-v2/contracts/=node_modules/@layerzerolabs/lz-evm-oapp-v2/contracts/
+@layerzerolabs/lz-evm-protocol-v2/contracts/=node_modules/@layerzerolabs/lz-evm-protocol-v2/contracts/
+@layerzerolabs/lz-evm-messagelib-v2/contracts/=node_modules/@layerzerolabs/lz-evm-messagelib-v2/contracts/
+@layerzerolabs/lz-evm-oapp-v2/contracts-upgradeable/=node_modules/layerzero-v2/oapp/contracts/

@@ -13,7 +13,7 @@ https://lrt2.gitbook.io/lrt2
 #### Build
 
 ```shell
-$ forge build
+$ yarn build
 ```
 
 #### Test

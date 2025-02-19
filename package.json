@@ -3,7 +3,7 @@
   "version": "v0.5",
   "license": "MIT",
   "scripts": {
-    "build": "forge build",
+    "build": "yarn install && forge build",
     "test": "forge test",
     "compile": "forge compile"
   },
@@ -15,8 +15,17 @@
     "dotenv": "^16.4.5",
     "ethers": "^5.7.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "@layerzerolabs/lz-evm-messagelib-v2": "^2.1.27",
+    "@layerzerolabs/lz-evm-oapp-v2": "^2.1.18",
+    "@layerzerolabs/lz-evm-protocol-v2": "^2.1.27",
+    "solidity-bytes-utils": "^0.8.2",
+    "layerzero-v2": "github:JorgeAtPaladin/LayerZero-v2#21ad027cf323c323619566d2c9d1f2fa404f021f"
   },
+  "resolutions": {
+      "@openzeppelin/contracts-upgradeable": "5.0.2",
+      "@openzeppelin/contracts": "5.0.2"
+    },
   "devDependencies": {
     "@types/node": "^22.1.0"
   }
