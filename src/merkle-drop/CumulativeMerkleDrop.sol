@@ -33,6 +33,7 @@ import {ReentrancyGuardTransient} from "../utils/ReentrancyGuardTransient.sol";
 import {OAppUpgradeable, Origin} from "@layerzerolabs/lz-evm-oapp-v2/contracts-upgradeable/oapp/OAppUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {OptionsBuilder} from "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/libs/OptionsBuilder.sol";
+import {MessagingFee} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
 import {ClaimMessageCodec} from "./ClaimMessageCodec.sol";
 // Taken from https://github.com/1inch/merkle-distribution/blob/master/contracts/CumulativeMerkleDrop.sol
 contract CumulativeMerkleDrop is  
@@ -49,7 +50,6 @@ contract CumulativeMerkleDrop is
     // using MerkleProof for bytes32[];
 
     struct ChainInfo {
-        uint16 chainEid;
         uint128 singleMessageGasLimit;
         uint128 batchMessageGasLimit;
     }
@@ -62,15 +62,16 @@ contract CumulativeMerkleDrop is
     bytes32 public override merkleRoot;
     mapping(address => uint256) public cumulativeClaimed;
 
-    /// @notice Maps user addresses to their claim chain (default 0 represents mainnet)
-    mapping(address => uint16) public claimChain;
-
-    mapping(uint16 => ChainInfo) public chainInfo;
+    /// @notice Maps user addresses to their designated claim chain eid
+    /// @dev Default 0 value represent to mainnet
+    mapping(address => uint32) public claimEid;
+    /// @notice Maps chain id to chain info
+    mapping(uint32 => ChainInfo) public chainInfo;
 
     error InvalidChain();
 
-    event ClaimChainUpdated(address indexed account, uint16 newChain);
-    event ClaimChainUpdatedBatched(uint16 newChain);
+    event claimEidUpdated(address indexed account, uint32 newChain);
+    event claimEidUpdatedBatched(uint32 newChain);
 
     constructor(address _token, address _endpoint) OAppUpgradeable(_endpoint) {
         token = _token;
@@ -96,7 +97,11 @@ contract CumulativeMerkleDrop is
         if (merkleRoot != expectedMerkleRoot) revert MerkleRootWasUpdated();
 
         // Verify the claim chain
-        if (claimChain[account] != getChainId()) revert InvalidChain();
+        if (block.chainid == 1) {
+            if (claimEid[account] != 0) revert InvalidChain();
+        } else {
+            if (claimEid[account] != endpoint.eid()) revert InvalidChain();
+        }
 
         // Verify the merkle proof
         if (!verify(account, cumulativeAmount, expectedMerkleRoot, merkleProof)) revert InvalidProof();
@@ -114,56 +119,55 @@ contract CumulativeMerkleDrop is
         }
     }
 
-    function setClaimChain(uint16 newChain) external payable {
-        if (newChain == getChainId()) revert InvalidChain();
+    function quoteSetclaimEid(uint32 dstEid) external view returns (MessagingFee memory msgFee) {
+        bytes memory message = ClaimMessageCodec.encodeSingle(msg.sender, cumulativeClaimed[msg.sender]);
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
 
-        claimChain[msg.sender] = newChain;
-
-        ChainInfo memory info = chainInfo[newChain];
-
-        uint256 userAmountClaimed = cumulativeClaimed[msg.sender];
-
-        bytes memory message = ClaimMessageCodec.encodeSingle(msg.sender, userAmountClaimed);
-
-        _lzSend(
-            info.chainEid, 
-            message, 
-            OptionsBuilder.newOptions().addExecutorLzReceiveOption(info.singleMessageGasLimit, 0),
-            msg.sender, 
-            bytes("")
-        );
-
-        emit ClaimChainUpdated(msg.sender, newChain);
+        return _quote(dstEid, message, options, false);
     }
 
-    function batchSetClaimChain(address[] calldata accounts, uint16 newChain) external payable onlyRole(CHAIN_UPDATER_ADMIN_ROLE) {
+    function quoteBatchSetclaimEid(uint32 dstEid, address[] memory accounts, uint256[] memory amounts) external view returns (MessagingFee memory msgFee) {
+        bytes memory message = ClaimMessageCodec.encodeBatch(accounts, amounts);
+        uint128 dynamicGasLimit = (chainInfo[dstEid].batchMessageGasLimit * uint128(accounts.length)) + chainInfo[dstEid].singleMessageGasLimit;
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(dynamicGasLimit, 0);
+
+        return _quote(dstEid, message, options, false);
+    }
+
+    function setclaimEid(uint32 dstEid, MessagingFee memory msgFee) external payable {
+        if (dstEid == endpoint.eid()) revert InvalidChain();
+
+        claimEid[msg.sender] = dstEid;
+        bytes memory message = ClaimMessageCodec.encodeSingle(msg.sender, cumulativeClaimed[msg.sender]);
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
+
+        _lzSend(dstEid, message, options, msgFee, msg.sender);
+
+        emit claimEidUpdated(msg.sender, dstEid);
+    }
+
+    function batchSetclaimEid(address[] calldata accounts, uint32 dstEid, MessagingFee memory msgFee) external payable onlyRole(CHAIN_UPDATER_ADMIN_ROLE) {
         uint256[] memory amounts = new uint256[](accounts.length);
 
         for (uint256 i = 0; i < accounts.length; i++) {
-            claimChain[accounts[i]] = newChain;
+            claimEid[accounts[i]] = dstEid;
             amounts[i] = cumulativeClaimed[accounts[i]];
         }
 
         bytes memory message = ClaimMessageCodec.encodeBatch(accounts, amounts);
+        uint128 dynamicGasLimit = (chainInfo[dstEid].batchMessageGasLimit * uint128(accounts.length)) + chainInfo[dstEid].singleMessageGasLimit;
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(dynamicGasLimit, 0);
 
-        ChainInfo memory info = chainInfo[newChain];
+        _lzSend(dstEid, message, options, msgFee, msg.sender);
 
-        uint128 dynamicGasLimit = (info.batchMessageGasLimit * uint128(accounts.length)) + info.singleMessageGasLimit;
-
-        _lzSend(
-            info.chainEid, 
-            message, 
-            OptionsBuilder.newOptions().addExecutorLzReceiveOption(dynamicGasLimit, 0),
-            msg.sender,
-            bytes("")
-        );
-
-        emit ClaimChainUpdatedBatched(newChain);
+        emit claimEidUpdatedBatched(dstEid);
     }
 
-    function setChainToEid(uint16 chain, uint16 eid, uint128 singleMessageGasLimit, uint128 batchMessageGasLimit) external onlyRole(CHAIN_UPDATER_ADMIN_ROLE) {
-        chainInfo[chain] = ChainInfo({
-            chainEid: eid,
+    function addChain(uint32 eid, uint128 singleMessageGasLimit, uint128 batchMessageGasLimit, bytes32 peer) external onlyRole(DEFAULT_ADMIN_ROLE) {
+
+        setPeer(eid, peer);
+        
+        chainInfo[eid] = ChainInfo({
             singleMessageGasLimit: singleMessageGasLimit,
             batchMessageGasLimit: batchMessageGasLimit
         });
@@ -177,14 +181,6 @@ contract CumulativeMerkleDrop is
     ) public pure returns (bool) {
         bytes32 leaf = keccak256(abi.encodePacked(account, cumulativeAmount));
         return _verifyAsm(merkleProof, expectedMerkleRoot, leaf);
-    }
-
-    function getChainId() public view returns (uint16) {
-        uint16 currentChain = uint16(block.chainid);
-        if (currentChain == 1) {
-            return 0;
-        } 
-        return currentChain;
     }
 
     function pause() external whenNotPaused onlyRole(PAUSER_ROLE) {
@@ -204,15 +200,21 @@ contract CumulativeMerkleDrop is
     ) internal override {
         uint8 messageType = ClaimMessageCodec.decodeType(_message);
 
+        uint32 newClaimEid = endpoint.eid();
+        if(block.chainid == 1) {
+            newClaimEid = 0;
+        }
+
         if (messageType == ClaimMessageCodec.TYPE_SINGLE) {
             (address user, uint256 amount) = ClaimMessageCodec.decodeSingle(_message);
             
-            claimChain[user] = getChainId();
+            claimEid[user] = newClaimEid;
             cumulativeClaimed[user] = amount;
         } else if (messageType == ClaimMessageCodec.TYPE_BATCH) {
             (address[] memory users, uint256[] memory amounts) = ClaimMessageCodec.decodeBatch(_message);
+
             for (uint256 i = 0; i < users.length; i++) {
-                claimChain[users[i]] = getChainId();
+                claimEid[users[i]] = newClaimEid;
                 cumulativeClaimed[users[i]] = amounts[i];
             }
         }

@@ -29,7 +29,7 @@ library ClaimMessageCodec {
      * @param addrs Array of addresses
      * @param amounts Array of amounts
      */
-    function encodeBatch(address[] calldata addrs, uint256[] calldata amounts) internal pure returns (bytes memory) {
+    function encodeBatch(address[] memory addrs, uint256[] memory amounts) internal pure returns (bytes memory) {
         require(addrs.length == amounts.length, "Length mismatch");
         return abi.encode(TYPE_BATCH, addrs, amounts);
     }
@@ -38,7 +38,7 @@ library ClaimMessageCodec {
      * @dev Decodes a message based on its type
      * @param message The encoded message
      */
-    function decodeType(bytes calldata message) internal pure returns (uint8 messageType) {
+    function decodeType(bytes memory message) internal pure returns (uint8 messageType) {
         return abi.decode(message, (uint8));
     }
 
@@ -46,7 +46,7 @@ library ClaimMessageCodec {
      * @dev Decodes a single message
      * @param message The encoded message
      */
-    function decodeSingle(bytes calldata message) internal pure returns (address addr, uint256 amount) {
+    function decodeSingle(bytes memory message) internal pure returns (address addr, uint256 amount) {
         (addr, amount) = abi.decode(message, (address, uint256));
     }
 
@@ -54,7 +54,7 @@ library ClaimMessageCodec {
      * @dev Decodes a batch of messages
      * @param message The encoded message
      */ 
-    function decodeBatch(bytes calldata message) internal pure returns (address[] memory addrs, uint256[] memory amounts) {
+    function decodeBatch(bytes memory message) internal pure returns (address[] memory addrs, uint256[] memory amounts) {
         (addrs, amounts) = abi.decode(message, (address[], uint256[]));
     }
 }
