@@ -27,21 +27,23 @@ pragma solidity ^0.8.24;
 import {AccessControlDefaultAdminRulesUpgradeable} from "@openzeppelin-upgradeable/contracts/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
-import { SafeERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { ICumulativeMerkleDrop } from "../interfaces/ICumulativeMerkleDrop.sol";
+import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ICumulativeMerkleDrop} from "../interfaces/ICumulativeMerkleDrop.sol";
 import {ReentrancyGuardTransient} from "../utils/ReentrancyGuardTransient.sol";
 import {OAppUpgradeable, Origin} from "@layerzerolabs/lz-evm-oapp-v2/contracts-upgradeable/oapp/OAppUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {OptionsBuilder} from "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/libs/OptionsBuilder.sol";
 import {MessagingFee} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
-import {ClaimMessageCodec} from "./ClaimMessageCodec.sol";
+import {IOFT} from "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/interfaces/IOFT.sol";
+import {CumulativeMerkleCodec} from "./CumulativeMerkleCodec.sol";
+import {SendParam} from "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/interfaces/IOFT.sol";
 // Taken from https://github.com/1inch/merkle-distribution/blob/master/contracts/CumulativeMerkleDrop.sol
-contract CumulativeMerkleDrop is  
-    ICumulativeMerkleDrop, 
+contract CumulativeMerkleDrop is
+    ICumulativeMerkleDrop,
     Initializable,
     UUPSUpgradeable,
-    AccessControlDefaultAdminRulesUpgradeable, 
-    PausableUpgradeable, 
+    AccessControlDefaultAdminRulesUpgradeable,
+    PausableUpgradeable,
     ReentrancyGuardTransient,
     OAppUpgradeable
 {
@@ -51,11 +53,10 @@ contract CumulativeMerkleDrop is
 
     struct ChainInfo {
         uint128 singleMessageGasLimit;
-        uint128 batchMessageGasLimit;
     }
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-    bytes32 public constant CHAIN_UPDATER_ADMIN_ROLE = keccak256("CHAIN_UPDATER_ADMIN_ROLE");
+
     // solhint-disable-next-line immutable-vars-naming
     address public immutable override token;
 
@@ -68,23 +69,35 @@ contract CumulativeMerkleDrop is
     /// @notice Maps chain id to chain info
     mapping(uint32 => ChainInfo) public chainInfo;
 
+    address public immutable oftAdapter;
+
     error InvalidChain();
 
-    event claimEidUpdated(address indexed account, uint32 newChain);
-    event claimEidUpdatedBatched(uint32 newChain);
-
-    constructor(address _token, address _endpoint) OAppUpgradeable(_endpoint) {
+    event ClaimEidUpdated(address indexed account, uint32 newChain);
+    event ClaimEidUpdatedBatched(uint32 newChain);
+    event MerkleRootPropagated(uint32 newChain, bytes32 newMerkleRoot);
+    
+    constructor(address _token, address _endpoint, address _oftAdapter) OAppUpgradeable(_endpoint) {
         token = _token;
+        oftAdapter = _oftAdapter;
         _disableInitializers();
     }
 
-    function initialize(uint48 _accessControlDelay, address _owner, address _pauser) external initializer {
+    function initialize(
+        uint48 _accessControlDelay,
+        address _owner,
+        address _pauser
+    ) external initializer {
         __AccessControlDefaultAdminRules_init_unchained(_accessControlDelay, _owner);
         _grantRole(PAUSER_ROLE, _pauser);
     }
 
+    function initializeLayerZero() external reinitializer(2) {
+        __OAppCore_init_unchained(owner());
+    }
+
     function setMerkleRoot(bytes32 merkleRoot_) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        emit MerkelRootUpdated(merkleRoot, merkleRoot_);
+        emit MerkleRootUpdated(merkleRoot, merkleRoot_);
         merkleRoot = merkleRoot_;
     }
 
@@ -104,7 +117,8 @@ contract CumulativeMerkleDrop is
         }
 
         // Verify the merkle proof
-        if (!verify(account, cumulativeAmount, expectedMerkleRoot, merkleProof)) revert InvalidProof();
+        if (!verify(account, cumulativeAmount, expectedMerkleRoot, merkleProof))
+            revert InvalidProof();
 
         // Mark it claimed
         uint256 preclaimed = cumulativeClaimed[account];
@@ -119,64 +133,10 @@ contract CumulativeMerkleDrop is
         }
     }
 
-    function quoteSetclaimEid(uint32 dstEid) external view returns (MessagingFee memory msgFee) {
-        bytes memory message = ClaimMessageCodec.encodeSingle(msg.sender, cumulativeClaimed[msg.sender]);
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
-
-        return _quote(dstEid, message, options, false);
-    }
-
-    function quoteBatchSetclaimEid(uint32 dstEid, address[] memory accounts, uint256[] memory amounts) external view returns (MessagingFee memory msgFee) {
-        bytes memory message = ClaimMessageCodec.encodeBatch(accounts, amounts);
-        uint128 dynamicGasLimit = (chainInfo[dstEid].batchMessageGasLimit * uint128(accounts.length)) + chainInfo[dstEid].singleMessageGasLimit;
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(dynamicGasLimit, 0);
-
-        return _quote(dstEid, message, options, false);
-    }
-
-    function setclaimEid(uint32 dstEid, MessagingFee memory msgFee) external payable {
-        if (dstEid == endpoint.eid()) revert InvalidChain();
-
-        claimEid[msg.sender] = dstEid;
-        bytes memory message = ClaimMessageCodec.encodeSingle(msg.sender, cumulativeClaimed[msg.sender]);
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
-
-        _lzSend(dstEid, message, options, msgFee, msg.sender);
-
-        emit claimEidUpdated(msg.sender, dstEid);
-    }
-
-    function batchSetclaimEid(address[] calldata accounts, uint32 dstEid, MessagingFee memory msgFee) external payable onlyRole(CHAIN_UPDATER_ADMIN_ROLE) {
-        uint256[] memory amounts = new uint256[](accounts.length);
-
-        for (uint256 i = 0; i < accounts.length; i++) {
-            claimEid[accounts[i]] = dstEid;
-            amounts[i] = cumulativeClaimed[accounts[i]];
-        }
-
-        bytes memory message = ClaimMessageCodec.encodeBatch(accounts, amounts);
-        uint128 dynamicGasLimit = (chainInfo[dstEid].batchMessageGasLimit * uint128(accounts.length)) + chainInfo[dstEid].singleMessageGasLimit;
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(dynamicGasLimit, 0);
-
-        _lzSend(dstEid, message, options, msgFee, msg.sender);
-
-        emit claimEidUpdatedBatched(dstEid);
-    }
-
-    function addChain(uint32 eid, uint128 singleMessageGasLimit, uint128 batchMessageGasLimit, bytes32 peer) external onlyRole(DEFAULT_ADMIN_ROLE) {
-
-        setPeer(eid, peer);
-        
-        chainInfo[eid] = ChainInfo({
-            singleMessageGasLimit: singleMessageGasLimit,
-            batchMessageGasLimit: batchMessageGasLimit
-        });
-    }
-
     function verify(
-        address account, 
-        uint256 cumulativeAmount, 
-        bytes32 expectedMerkleRoot, 
+        address account,
+        uint256 cumulativeAmount,
+        bytes32 expectedMerkleRoot,
         bytes32[] calldata merkleProof
     ) public pure returns (bool) {
         bytes32 leaf = keccak256(abi.encodePacked(account, cumulativeAmount));
@@ -191,41 +151,21 @@ contract CumulativeMerkleDrop is
         _unpause();
     }
 
-    function _lzReceive(
-        Origin calldata _origin,
-        bytes32 _guid,
-        bytes calldata _message,
-        address /*_executor*/,
-        bytes calldata /*_extraData*/
-    ) internal override {
-        uint8 messageType = ClaimMessageCodec.decodeType(_message);
-
-        uint32 newClaimEid = endpoint.eid();
-        if(block.chainid == 1) {
-            newClaimEid = 0;
-        }
-
-        if (messageType == ClaimMessageCodec.TYPE_SINGLE) {
-            (address user, uint256 amount) = ClaimMessageCodec.decodeSingle(_message);
-            
-            claimEid[user] = newClaimEid;
-            cumulativeClaimed[user] = amount;
-        } else if (messageType == ClaimMessageCodec.TYPE_BATCH) {
-            (address[] memory users, uint256[] memory amounts) = ClaimMessageCodec.decodeBatch(_message);
-
-            for (uint256 i = 0; i < users.length; i++) {
-                claimEid[users[i]] = newClaimEid;
-                cumulativeClaimed[users[i]] = amounts[i];
-            }
-        }
-    }
-
-    function _verifyAsm(bytes32[] calldata proof, bytes32 root, bytes32 leaf) private pure returns (bool valid) {
+    function _verifyAsm(
+        bytes32[] calldata proof,
+        bytes32 root,
+        bytes32 leaf
+    ) private pure returns (bool valid) {
         /// @solidity memory-safe-assembly
-        assembly {  // solhint-disable-line no-inline-assembly
+        assembly {
+            // solhint-disable-line no-inline-assembly
             let ptr := proof.offset
 
-            for { let end := add(ptr, mul(0x20, proof.length)) } lt(ptr, end) { ptr := add(ptr, 0x20) } {
+            for {
+                let end := add(ptr, mul(0x20, proof.length))
+            } lt(ptr, end) {
+                ptr := add(ptr, 0x20)
+            } {
                 let node := calldataload(ptr)
 
                 switch lt(leaf, node)
@@ -242,6 +182,141 @@ contract CumulativeMerkleDrop is
             }
 
             valid := eq(root, leaf)
+        }
+    }
+
+    
+    /**
+     *  Add a new chain as a peer
+     */
+    function addChain(uint32 eid, uint128 singleMessageGasLimit, bytes32 peer) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        setPeer(eid, peer);
+
+        chainInfo[eid] = ChainInfo({singleMessageGasLimit: singleMessageGasLimit});
+    }
+
+    /**
+     * Quote LayerZero actions
+     */
+
+    function quoteSetClaimEid(uint32 dstEid) external view returns (MessagingFee memory msgFee) {
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
+
+        return _quote(dstEid, CumulativeMerkleCodec.encodeSingle(address(0), 0), options, false);
+    }
+
+    function quotePropagateMerkleRoot(uint32 dstEid) external view returns (MessagingFee memory msgFee) {
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
+
+        return _quote(dstEid, CumulativeMerkleCodec.encodeMerkleRoot(merkleRoot), options, false);
+    }
+
+    function quoteBatchSetClaimEid(uint32 dstEid, uint256 numAccounts) external view returns (MessagingFee memory msgFee) {    
+        bytes memory message = CumulativeMerkleCodec.encodeBatch(new address[](numAccounts), new uint256[](numAccounts));
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
+
+        return _quote(dstEid, message, options, false);
+    }
+
+    /**
+     * LayerZero actions
+     */
+
+    function setClaimEid(uint32 dstEid,MessagingFee memory msgFee) external payable {
+        if (dstEid == endpoint.eid()) revert InvalidChain();
+
+        claimEid[msg.sender] = dstEid;
+        bytes memory message = CumulativeMerkleCodec.encodeSingle(msg.sender, cumulativeClaimed[msg.sender]);
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
+
+        _lzSend(dstEid, message, options, msgFee, msg.sender);
+
+        emit ClaimEidUpdated(msg.sender, dstEid);
+    }
+
+    function batchSetClaimEid(address[] calldata accounts, uint32 dstEid, MessagingFee memory msgFee) external payable onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256[] memory amounts = new uint256[](accounts.length);
+
+        for (uint256 i = 0; i < accounts.length; i++) {
+            claimEid[accounts[i]] = dstEid;
+            amounts[i] = cumulativeClaimed[accounts[i]];
+        }
+
+        bytes memory message = CumulativeMerkleCodec.encodeBatch(accounts, amounts);
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
+
+        _lzSend(dstEid, message, options, msgFee, msg.sender);
+
+        emit ClaimEidUpdatedBatched(dstEid);
+    }
+
+    function propagateMerkleRoot(uint32 dstEid, MessagingFee memory msgFee) external payable onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes memory message = CumulativeMerkleCodec.encodeMerkleRoot(merkleRoot);
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
+
+        _lzSend(dstEid, message, options, msgFee, msg.sender);
+    }
+
+    function topUpPeer(uint32 dstEid, uint256 amount, MessagingFee memory msgFee) external payable onlyRole(DEFAULT_ADMIN_ROLE) {
+
+        bytes32 peer = _getPeerOrRevert(dstEid);
+
+        SendParam memory param = SendParam({
+            dstEid: dstEid,
+            to: peer,
+            amountLD: amount,
+            minAmountLD: (amount),
+            extraOptions: OptionsBuilder.newOptions().addExecutorLzReceiveOption(200_000, 0),
+            composeMsg: "",
+            oftCmd: ""
+        });
+
+        if (block.chainid == 1) {
+            IERC20(token).approve(oftAdapter, amount);
+            IOFT(oftAdapter).send{value: msgFee.nativeFee}(param, msgFee, msg.sender);
+        } else {
+            IERC20(token).approve(token, amount);
+            IOFT(token).send{value: msgFee.nativeFee}(param, msgFee, msg.sender);
+        }
+    } 
+
+    /**
+     * @dev implements the layerzero receive function to handle inbound messages from other chains
+     */
+    function _lzReceive(
+        Origin calldata /*_origin*/,
+        bytes32 /*_guid*/,
+        bytes calldata _message,
+        address /*_executor*/,
+        bytes calldata /*_extraData*/
+    ) internal override {
+        uint8 messageType = CumulativeMerkleCodec.decodeType(_message);
+
+        uint32 newClaimEid = endpoint.eid();
+        if (block.chainid == 1) {
+            newClaimEid = 0;
+        }
+
+        if (messageType == CumulativeMerkleCodec.TYPE_SINGLE) {
+            (address user, uint256 amount) = CumulativeMerkleCodec.decodeSingle(_message);
+
+            claimEid[user] = newClaimEid;
+            cumulativeClaimed[user] = amount;
+        } else if (messageType == CumulativeMerkleCodec.TYPE_BATCH) {
+            (address[] memory users, uint256[] memory amounts) = CumulativeMerkleCodec.decodeBatch(_message);
+
+            for (uint256 i = 0; i < users.length; i++) {
+                claimEid[users[i]] = newClaimEid;
+                cumulativeClaimed[users[i]] = amounts[i];
+            }
+        } else if (messageType == CumulativeMerkleCodec.TYPE_MERKLE_ROOT) {
+            bytes32 merkleRoot_ = CumulativeMerkleCodec.decodeMerkleRoot(_message);
+
+            emit MerkleRootUpdated(merkleRoot, merkleRoot_);
+            merkleRoot = merkleRoot_;
+        } else {
+            // TODO: maybe revert is not the best option here
+            revert("Invalid message type");
         }
     }
 

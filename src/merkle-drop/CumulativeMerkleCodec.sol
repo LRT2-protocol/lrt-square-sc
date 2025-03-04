@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-library ClaimMessageCodec {
+library CumulativeMerkleCodec {
     // TODO: take inspiration from the OFTComposeMsgCodec for ways to improve this
     uint8 constant TYPE_SINGLE = 1;
     uint8 constant TYPE_BATCH = 2;
+    uint8 constant TYPE_MERKLE_ROOT = 3;
     
     struct claimMessage {
         address addr;
@@ -33,6 +34,14 @@ library ClaimMessageCodec {
         require(addrs.length == amounts.length, "Length mismatch");
         return abi.encode(TYPE_BATCH, addrs, amounts);
     }
+
+    /**
+     * @dev Encodes a merkle root message (bytes32)
+     * @param merkleRoot The merkle root
+     */
+    function encodeMerkleRoot(bytes32 merkleRoot) internal pure returns (bytes memory) {
+        return abi.encode(TYPE_MERKLE_ROOT, merkleRoot);
+    }
     
     /**
      * @dev Decodes a message based on its type
@@ -47,7 +56,7 @@ library ClaimMessageCodec {
      * @param message The encoded message
      */
     function decodeSingle(bytes memory message) internal pure returns (address addr, uint256 amount) {
-        (addr, amount) = abi.decode(message, (address, uint256));
+        (,addr, amount) = abi.decode(message, (uint8, address, uint256));
     }
 
     /**
@@ -55,6 +64,14 @@ library ClaimMessageCodec {
      * @param message The encoded message
      */ 
     function decodeBatch(bytes memory message) internal pure returns (address[] memory addrs, uint256[] memory amounts) {
-        (addrs, amounts) = abi.decode(message, (address[], uint256[]));
+        (,addrs, amounts) = abi.decode(message, (uint8, address[], uint256[]));
+    }
+
+    /**
+     * @dev Decodes a merkle root message
+     * @param message The encoded message
+     */
+    function decodeMerkleRoot(bytes memory message) internal pure returns (bytes32 merkleRoot) {
+        (,merkleRoot) = abi.decode(message, (uint8, bytes32));
     }
 }

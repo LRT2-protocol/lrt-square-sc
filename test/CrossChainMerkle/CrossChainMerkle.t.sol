@@ -1,81 +1,247 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {CumulativeMerkleDrop} from "../../src/merkle-drop/CumulativeMerkleDrop.sol";
+import "@layerzerolabs/lz-evm-messagelib-v2/contracts/uln/UlnBase.sol";
+import "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/IMessageLibManager.sol";
+import {CumulativeMerkleDrop, ICumulativeMerkleDrop} from "../../src/merkle-drop/CumulativeMerkleDrop.sol";
 import {UUPSProxy} from "../../src/UUPSProxy.sol";
-import {MessagingFee} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
+import {MessagingFee, Origin} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
 import {Test} from "forge-std/Test.sol";
+import {CumulativeMerkleCodec} from "../../src/merkle-drop/CumulativeMerkleCodec.sol";
+import {console} from "forge-std/console.sol";
 
 contract CrossChainMerkle is Test {
     address lrt2 = 0x8F08B70456eb22f6109F57b8fafE862ED28E6040;
     address lzEndpoint = 0x1a44076050125825900e736c501f859c50fE728c;
+    address oftAdapter = 0x4c8A4521F2431b0aC003829ac4e6dBC4Ed97707d;
     address kingProtocolOwner = 0xA000244b4a36D57Ea1ECB39b5F02f255e4C8cd52;
     address cumulativeMerkle = 0x6Db24Ee656843E3fE03eb8762a54D86186bA6B64;
 
-    address user = 0xFB505Aa37508B641CE4D8f066867Db3B3F66185D;
+    address user1 = 0xFB505Aa37508B641CE4D8f066867Db3B3F66185D;
+    uint256 user1CumulativeAmount = 46986201288251449522;
+    address user2 = 0xCB4269C7156C9C18a3ec88353C48000f79eD1359;
+    uint256 user2CumulativeAmount = 25768231672529417;
+
+    bytes32 currentMerkleRoot = 0x1871f7e6db1a66587ef1024b17102d75bfa72d8eb4dfe4d2249a3e19c8511827;
+    uint256 currentBlock = 21896150;
 
     CumulativeMerkleDrop cumulativeMerkleDrop;
 
-    bytes32[] proof;
+    bytes32[] proof1;
+    bytes32[] proof2;
 
     function setUp() public {
-        // create a fork at block 21896190
-        vm.createSelectFork("https://eth-pokt.nodies.app", 21896190);
+        // create a fork at block 21896150
+        vm.createSelectFork("https://mainnet.gateway.tenderly.co", currentBlock);
         cumulativeMerkleDrop = CumulativeMerkleDrop(payable(cumulativeMerkle));
 
         vm.startPrank(kingProtocolOwner);
 
-        address cumulativeMerkleDropImpl = address(new CumulativeMerkleDrop(lrt2, lzEndpoint));
+        address cumulativeMerkleDropImpl = address(new CumulativeMerkleDrop(lrt2, lzEndpoint, oftAdapter));
 
         CumulativeMerkleDrop(payable(cumulativeMerkle)).upgradeToAndCall(cumulativeMerkleDropImpl, "");
 
-        cumulativeMerkleDrop.addChain(30184, 300_000, 300_000, toBytes32(cumulativeMerkle));
+        cumulativeMerkleDrop.initializeLayerZero();
+
+        // cumulativeMerkleDrop.setDelegate(kingProtocolOwner);
+
+        cumulativeMerkleDrop.addChain(30335, 300_000, toBytes32(cumulativeMerkle));
+
+        IMessageLibManager(lzEndpoint).setConfig(
+            cumulativeMerkle, 
+            0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1, // sendLib 
+            getDVNConfig()
+        );
 
         vm.stopPrank();
 
-        // Initialize proof array
-        proof = new bytes32[](19);
-        proof[0] = 0xc6d06a2b06ac1745bc57320f3ad3c26572848774a6109b7e12ca47906e9cb040;
-        proof[1] = 0xf306078c23a4b457450e4b82730f8bc5f640ffec951a53c540421ba2d8242eeb;
-        proof[2] = 0x46d275cf5f79cab92f374dcc95a51e0c09a13160b34b476da8a8516c58173485;
-        proof[3] = 0x9d0980a5fc5a93311fc2e1a30a6f26893492d6ea59e4f448a8aa63bf04cddf59;
-        proof[4] = 0xb3acfbf9bb69730e424a0554f64ee2c92af4f62c773323eb00a4b5fdde8d8b11;
-        proof[5] = 0xd1590b98a940875552fbf3971ca2eb06074aa603ac9e62d8e43b78d546c0f204;
-        proof[6] = 0xc0b9bd84bf2109d9224216927c1a78ab01d008dc975a812f541a594a99d0f8a5;
-        proof[7] = 0x529b2904a8454406f9edca560bb696fed13da45217871054932de9ef8cbd9b77;
-        proof[8] = 0xf3287b26906d49b33bbe4df11f7eb5949efd2b417bd8eb5e96ba53f01f2d7f24;
-        proof[9] = 0x161e072814ce2b6b52abe568b670a8d29e03790ea0d550dd406919d63eb0b4dc;
-        proof[10] = 0x46b1af59d8a58bc786c92c140ab9fa8b6f43fd94068fa4a6a551e4ea311d1b35;
-        proof[11] = 0xe0ea80ae4f0ca3419614a34d471657e47428ade807046bf471ecdde5afac9e8f;
-        proof[12] = 0x2376f0cd72ac97afbdfce877cb9b601d0bcf3fdcf63f3efe56400eb35f15ba28;
-        proof[13] = 0xb912a7e51a6dbf0dfe6a405a1a18e137e10e2ca776f32f652809c4e14e865692;
-        proof[14] = 0x01050afec693223ba29ea79104b302560bdff1f784497bb64a8ca258824b108f;
-        proof[15] = 0x1703880ad551e70dd18c57b27b0da73d1d0f5e8b56c00e91de5d140840236a39;
-        proof[16] = 0x053a2be67e9f4d1520e7706a7ccb335ca0569568bb2f0ff35f57fb7e2a30fb36;
-        proof[17] = 0x4021b4ea34d7624d13c74451edafd9cddf83127fc9515084a0e4d1accf844e43;
-        proof[18] = 0x6deded95694c7596062008d823b1a70053585c30cb144b7a35e4c132ea274633;
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/test/CrossChainMerkle/TestMerkleData.json");
+        string memory json = vm.readFile(path);
+        bytes memory proofData = vm.parseJson(json, ".Proof1");
+        proof1 = abi.decode(proofData, (bytes32[]));
+
+        bytes memory proofData2 = vm.parseJson(json, ".Proof2");
+        proof2 = abi.decode(proofData2, (bytes32[]));
+
     }
 
-    function test_defaultClaim() public {
-        vm.startPrank(user);
-
-        cumulativeMerkleDrop.claim(user, 46986201288251449522, 0x1871f7e6db1a66587ef1024b17102d75bfa72d8eb4dfe4d2249a3e19c8511827, proof);
+    function test_DefaultClaim() public {
+        cumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
+        cumulativeMerkleDrop.claim(user2, user2CumulativeAmount, currentMerkleRoot, proof2);
     }
 
-    function test_switchChain() public {
-        vm.startPrank(user);
+    function test_SwitchChain() public {
+        vm.startPrank(user1);
 
-        MessagingFee memory msgFee = cumulativeMerkleDrop.quoteSetclaimEid(30184);
+        MessagingFee memory msgFee = cumulativeMerkleDrop.quoteSetClaimEid(30335);
 
-        cumulativeMerkleDrop.setclaimEid{value: msgFee.nativeFee}(30184, msgFee);
+        cumulativeMerkleDrop.setClaimEid{value: msgFee.nativeFee}(30335, msgFee);
 
         vm.expectRevert(CumulativeMerkleDrop.InvalidChain.selector);
-        cumulativeMerkleDrop.claim(user, 46986201288251449522, 0x1871f7e6db1a66587ef1024b17102d75bfa72d8eb4dfe4d2249a3e19c8511827, proof);
+        cumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
 
         vm.stopPrank();
+    }
+
+    function test_BatchSwitchChain() public {
+        startHoax(kingProtocolOwner);
+
+        address[] memory users = new address[](2);
+        users[0] = user1;
+        users[1] = user2;
+
+        MessagingFee memory msgFee = cumulativeMerkleDrop.quoteBatchSetClaimEid(30335, 2);
+
+        cumulativeMerkleDrop.batchSetClaimEid{value: msgFee.nativeFee}(users, 30335, msgFee);
+
+        vm.expectRevert(CumulativeMerkleDrop.InvalidChain.selector);
+        cumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
+        vm.expectRevert(CumulativeMerkleDrop.InvalidChain.selector);
+        cumulativeMerkleDrop.claim(user2, user2CumulativeAmount, currentMerkleRoot, proof2);
+
+        vm.stopPrank();
+    }
+
+    function test_ReceiveChainSwitch() public {
+        test_SwitchChain();
+
+        bytes memory message = CumulativeMerkleCodec.encodeSingle(user1, cumulativeMerkleDrop.cumulativeClaimed(user1));
+        vm.prank(lzEndpoint);
+        Origin memory origin = Origin({srcEid: 30335, sender: toBytes32(cumulativeMerkle), nonce: 1});
+        cumulativeMerkleDrop.lzReceive( origin, bytes32(0x0), message, address(0), abi.encode(1));
+
+        test_DefaultClaim();
+    }
+
+    function test_ReceiveChainSwitchBatch() public {
+        test_BatchSwitchChain();
+
+        address[] memory users = new address[](2);
+        users[0] = user1;
+        users[1] = user2;
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = cumulativeMerkleDrop.cumulativeClaimed(user1);
+        amounts[1] = cumulativeMerkleDrop.cumulativeClaimed(user2);
+
+        bytes memory message = CumulativeMerkleCodec.encodeBatch(users, amounts);
+
+        vm.prank(lzEndpoint);
+        Origin memory origin = Origin({srcEid: 30335, sender: toBytes32(cumulativeMerkle), nonce: 1});
+        cumulativeMerkleDrop.lzReceive(
+            origin,
+            bytes32(0x0),
+            message,
+            address(0),
+            abi.encode(1)
+        );
+
+        test_DefaultClaim();
+    }
+
+    function test_PropagateMerkleRoot() public {
+        startHoax(kingProtocolOwner); 
+
+        MessagingFee memory msgFee = cumulativeMerkleDrop.quotePropagateMerkleRoot(30335);
+        cumulativeMerkleDrop.propagateMerkleRoot{value: msgFee.nativeFee}(30335, msgFee);
+        vm.stopPrank();
+
+        // random merkle root
+        bytes32 newMerkleRoot = 0x7465737400000000000000000000000000000000000000000000000000000000;
+        bytes memory message = CumulativeMerkleCodec.encodeMerkleRoot(newMerkleRoot);
+        vm.prank(lzEndpoint);
+        Origin memory origin = Origin({srcEid: 30335, sender: toBytes32(cumulativeMerkle), nonce: 1});
+        cumulativeMerkleDrop.lzReceive(
+            origin,
+            bytes32(0x0),
+            message,
+            address(0),
+            abi.encode(1)
+        );
+
+        assertEq(cumulativeMerkleDrop.merkleRoot(), newMerkleRoot);
+
+        vm.expectRevert(ICumulativeMerkleDrop.MerkleRootWasUpdated.selector);
+        cumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
+    }
+
+    function test_TopUpPeer() public {
+        startHoax(kingProtocolOwner);
+
+        MessagingFee memory msgFee = MessagingFee({nativeFee: 0.1 ether, lzTokenFee: 0});
+        cumulativeMerkleDrop.topUpPeer{value: msgFee.nativeFee}(30335, 10 ether, msgFee);
+        vm.stopPrank();
+    }
+
+    address swellLZEndpoint = 0xcb566e3B6934Fa77258d68ea18E931fa75e1aaAa;
+    address swellKingToken = 0xc2606AADe4bdd978a4fa5a6edb3b66657acEe6F8;
+
+    function test_L2Flow() public {
+        vm.createSelectFork("https://swell-mainnet.alt.technology");
+
+        startHoax(kingProtocolOwner);
+
+        address swellCumulativeMerkleDropImpl = address(new CumulativeMerkleDrop(swellKingToken, swellLZEndpoint, oftAdapter));
+        CumulativeMerkleDrop swellCumulativeMerkleDrop = CumulativeMerkleDrop(address(
+            new UUPSProxy(
+                swellCumulativeMerkleDropImpl,
+                abi.encodeWithSelector(
+                    CumulativeMerkleDrop.initialize.selector,
+                    120,
+                    kingProtocolOwner, 
+                    kingProtocolOwner
+                )
+            )
+        ));
+        swellCumulativeMerkleDrop.initializeLayerZero();
+        swellCumulativeMerkleDrop.addChain(30101, 300_000, toBytes32(cumulativeMerkle));
+
+        deal(swellKingToken, address(swellCumulativeMerkleDrop), 1000 ether);
+
+        bytes memory message = CumulativeMerkleCodec.encodeMerkleRoot(currentMerkleRoot);
+        vm.startPrank(swellLZEndpoint);
+        Origin memory origin = Origin({srcEid: 30101, sender: toBytes32(cumulativeMerkle), nonce: 1});
+        swellCumulativeMerkleDrop.lzReceive(origin, bytes32(0x0), message,address(0), abi.encode(1));
+
+        // claim chain should be defaulted to mainnet
+        vm.expectRevert(CumulativeMerkleDrop.InvalidChain.selector);
+        swellCumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
+
+
+        message = CumulativeMerkleCodec.encodeSingle(user1, 45536101163397729586);
+        origin = Origin({srcEid: 30101, sender: toBytes32(cumulativeMerkle), nonce: 1});
+        swellCumulativeMerkleDrop.lzReceive( origin, bytes32(0x0), message, address(0), abi.encode(1));
+
+        swellCumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
+
+        startHoax(kingProtocolOwner);
+
+        MessagingFee memory msgFee = MessagingFee({nativeFee: 0.1 ether, lzTokenFee: 0});
+        swellCumulativeMerkleDrop.topUpPeer{value: msgFee.nativeFee}(30101, 10 ether, msgFee);
     }
 
     function toBytes32(address addressValue) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(addressValue)));
+    }
+
+    // Set a base config
+    function getDVNConfig() internal pure returns (SetConfigParam[] memory) {
+        SetConfigParam[] memory params = new SetConfigParam[](1);
+        address[] memory requiredDVNs = new address[](1);
+        requiredDVNs[0] = 0x589dEDbD617e0CBcB916A9223F4d1300c294236b; // LZ DVN
+
+        UlnConfig memory ulnConfig = UlnConfig({
+            confirmations: 15,
+            requiredDVNCount: 1,
+            optionalDVNCount: 0,
+            optionalDVNThreshold: 0,
+            requiredDVNs: requiredDVNs,
+            optionalDVNs: new address[](0)
+        });
+
+        params[0] = SetConfigParam(30335, 2, abi.encode(ulnConfig));
+
+        return params;
     }
 }
