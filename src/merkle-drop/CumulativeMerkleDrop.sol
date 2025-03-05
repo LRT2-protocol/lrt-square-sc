@@ -33,10 +33,12 @@ import {ReentrancyGuardTransient} from "../utils/ReentrancyGuardTransient.sol";
 import {OAppUpgradeable, Origin} from "@layerzerolabs/lz-evm-oapp-v2/contracts-upgradeable/oapp/OAppUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {OptionsBuilder} from "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/libs/OptionsBuilder.sol";
-import {MessagingFee} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
+import {MessagingFee, MessagingParams} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
 import {IOFT} from "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/interfaces/IOFT.sol";
 import {CumulativeMerkleCodec} from "./CumulativeMerkleCodec.sol";
 import {SendParam} from "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/interfaces/IOFT.sol";
+import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+
 // Taken from https://github.com/1inch/merkle-distribution/blob/master/contracts/CumulativeMerkleDrop.sol
 contract CumulativeMerkleDrop is
     ICumulativeMerkleDrop,
@@ -49,6 +51,7 @@ contract CumulativeMerkleDrop is
 {
     using SafeERC20 for IERC20;
     using OptionsBuilder for bytes;
+    using EnumerableMap for EnumerableMap.UintToUintMap;
     // using MerkleProof for bytes32[];
 
     struct ChainInfo {
@@ -66,12 +69,20 @@ contract CumulativeMerkleDrop is
     /// @notice Maps user addresses to their designated claim chain eid
     /// @dev Default 0 value represent to mainnet
     mapping(address => uint32) public claimEid;
-    /// @notice Maps chain id to chain info
-    mapping(uint32 => ChainInfo) public chainInfo;
+
+    /// @notice Enumerable map of peer chain eids to the gas limit required to execute a single message `TYPE_SINGLE` or `TYPE_MERKLE_ROOT`
+    /// @dev Utilized to iterate over all the peers to propagate messages to the entire mesh network
+    EnumerableMap.UintToUintMap private peerToGasLimit;
 
     address public immutable oftAdapter;
+    
+    uint256 public maxBatchSize;
 
     error InvalidChain();
+    /// @dev This contract is designed to pay the cross chain message fee. Contract needs to be funded if this error is thrown
+    error InsufficientBalanceForMessageFee();
+    /// @dev Enforce a max batch size to prevent messages from being sent that are too large to be executed on the destination chain
+    error MaxBatchSizeExceeded();
 
     event ClaimEidUpdated(address indexed account, uint32 newChain);
     event ClaimEidUpdatedBatched(uint32 newChain);
@@ -92,8 +103,9 @@ contract CumulativeMerkleDrop is
         _grantRole(PAUSER_ROLE, _pauser);
     }
 
-    function initializeLayerZero() external reinitializer(2) {
+    function initializeLayerZero(uint256 _maxBatchSize) external reinitializer(2) {
         __OAppCore_init_unchained(owner());
+        maxBatchSize = _maxBatchSize;
     }
 
     function setMerkleRoot(bytes32 merkleRoot_) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -185,82 +197,123 @@ contract CumulativeMerkleDrop is
         }
     }
 
-    
     /**
-     *  Add a new chain as a peer
+     *  @notice Adds a new chain or updates the peer address or the gas limit for an existing peer chain
      */
     function addChain(uint32 eid, uint128 singleMessageGasLimit, bytes32 peer) external onlyRole(DEFAULT_ADMIN_ROLE) {
         setPeer(eid, peer);
-
-        chainInfo[eid] = ChainInfo({singleMessageGasLimit: singleMessageGasLimit});
+        peerToGasLimit.set(uint256(eid), uint256(singleMessageGasLimit));
     }
 
     /**
-     * Quote LayerZero actions
+     * @notice Removes a chain from the mesh network
      */
+    function removeChain(uint32 eid) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        setPeer(eid, bytes32(0));
+        peerToGasLimit.remove(uint256(eid));
+    }
 
+    /**
+     * @notice Quotes the LayerZero fee the user will pay to send the LZ message to change their claim chain
+     */
     function quoteSetClaimEid(uint32 dstEid) external view returns (MessagingFee memory msgFee) {
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(uint128(peerToGasLimit.get(uint256(dstEid))), 0);
 
         return _quote(dstEid, CumulativeMerkleCodec.encodeSingle(address(0), 0), options, false);
     }
 
-    function quotePropagateMerkleRoot(uint32 dstEid) external view returns (MessagingFee memory msgFee) {
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
+    /**
+     * @notice Quotes the LayerZero fee this contract will pay to send the merkle root to a specific peer
+     */
+    function quotePropagateMerkleRoot(uint32 dstEid) public view returns (MessagingFee memory msgFee) {
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(getPeerGasLimit(dstEid), 0);
 
         return _quote(dstEid, CumulativeMerkleCodec.encodeMerkleRoot(merkleRoot), options, false);
     }
 
-    function quoteBatchSetClaimEid(uint32 dstEid, uint256 numAccounts) external view returns (MessagingFee memory msgFee) {    
+    /**
+     * @notice Quotes the LayerZero fee this contract will pay to send the LZ message to change the claim chain of multiple users
+     * @dev Doesn't estimate the gas necessary to execute the `lzReceive` function on the destination chain
+     * Once the message is delivered, the payload will need be manually executed on the destination chain
+     */
+    function quoteBatchSetClaimEid(uint32 dstEid, uint256 numAccounts) public view returns (MessagingFee memory msgFee) {    
         bytes memory message = CumulativeMerkleCodec.encodeBatch(new address[](numAccounts), new uint256[](numAccounts));
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(getPeerGasLimit(dstEid), 0);
 
         return _quote(dstEid, message, options, false);
     }
-
+    
     /**
-     * LayerZero actions
+     * @notice User function to change their claim chain
      */
-
-    function setClaimEid(uint32 dstEid,MessagingFee memory msgFee) external payable {
+    function setClaimEid(uint32 dstEid, MessagingFee memory msgFee) external payable {
         if (dstEid == endpoint.eid()) revert InvalidChain();
 
         claimEid[msg.sender] = dstEid;
         bytes memory message = CumulativeMerkleCodec.encodeSingle(msg.sender, cumulativeClaimed[msg.sender]);
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(getPeerGasLimit(dstEid), 0);
 
         _lzSend(dstEid, message, options, msgFee, msg.sender);
 
         emit ClaimEidUpdated(msg.sender, dstEid);
     }
 
-    function batchSetClaimEid(address[] calldata accounts, uint32 dstEid, MessagingFee memory msgFee) external payable onlyRole(DEFAULT_ADMIN_ROLE) {
-        uint256[] memory amounts = new uint256[](accounts.length);
+    /**
+     * @notice Admin function to change the claim chain on behalf of multiple users
+     * @dev Due to the complexity of estimating the gas required for this dynamic batch operation, the gas is not provided on the source chain
+     * Once the message is delivered, the payload will need be manually executed on the destination chain
+     */
+    function batchSetClaimEid(address[] calldata accounts, uint32 dstEid) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (accounts.length > maxBatchSize) revert MaxBatchSizeExceeded();
 
+        MessagingFee memory msgFee = quoteBatchSetClaimEid(dstEid, accounts.length);
+        if (address(this).balance < msgFee.nativeFee) revert InsufficientBalanceForMessageFee();
+
+        uint256[] memory amounts = new uint256[](accounts.length);
         for (uint256 i = 0; i < accounts.length; i++) {
             claimEid[accounts[i]] = dstEid;
             amounts[i] = cumulativeClaimed[accounts[i]];
         }
 
         bytes memory message = CumulativeMerkleCodec.encodeBatch(accounts, amounts);
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(getPeerGasLimit(dstEid), 0);
 
-        _lzSend(dstEid, message, options, msgFee, msg.sender);
+        _lzSendFromContract(dstEid, message, options, msgFee);
 
         emit ClaimEidUpdatedBatched(dstEid);
     }
 
-    function propagateMerkleRoot(uint32 dstEid, MessagingFee memory msgFee) external payable onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes memory message = CumulativeMerkleCodec.encodeMerkleRoot(merkleRoot);
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(chainInfo[dstEid].singleMessageGasLimit, 0);
+    /**
+     * @notice Admin function to propagate the current merkle root to all the peers
+     */
+    function propagateMerkleRoot() external onlyRole(DEFAULT_ADMIN_ROLE) {
 
-        _lzSend(dstEid, message, options, msgFee, msg.sender);
+        bytes memory message = CumulativeMerkleCodec.encodeMerkleRoot(merkleRoot);
+        
+        // enumerate all the peers and propagate message
+        uint256[] memory allPeers = peerToGasLimit.keys();
+        for (uint256 i = 0; i < allPeers.length; i++) {
+            uint32 dstEid = uint32(allPeers[i]);
+
+            MessagingFee memory msgFee = quotePropagateMerkleRoot(dstEid);
+            if (address(this).balance < msgFee.nativeFee) revert InsufficientBalanceForMessageFee();
+
+            bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(getPeerGasLimit(dstEid), 0);
+            _lzSendFromContract(dstEid, message, options, msgFee);
+            emit MerkleRootPropagated(dstEid, merkleRoot);
+        }
     }
 
-    function topUpPeer(uint32 dstEid, uint256 amount, MessagingFee memory msgFee) external payable onlyRole(DEFAULT_ADMIN_ROLE) {
+    /**
+     * @notice Sends king tokens to the merkle drop contract on the destination chain
+     */
+    function topUpPeer(uint32 dstEid, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        IOFT oft = IOFT(token);
+        if (block.chainid == 1) { 
+            oft = IOFT(oftAdapter); 
+        }
 
         bytes32 peer = _getPeerOrRevert(dstEid);
-
         SendParam memory param = SendParam({
             dstEid: dstEid,
             to: peer,
@@ -271,17 +324,31 @@ contract CumulativeMerkleDrop is
             oftCmd: ""
         });
 
-        if (block.chainid == 1) {
-            IERC20(token).approve(oftAdapter, amount);
-            IOFT(oftAdapter).send{value: msgFee.nativeFee}(param, msgFee, msg.sender);
-        } else {
-            IERC20(token).approve(token, amount);
-            IOFT(token).send{value: msgFee.nativeFee}(param, msgFee, msg.sender);
-        }
-    } 
+        MessagingFee memory msgFee = oft.quoteSend(param, false);
+        if (address(this).balance < msgFee.nativeFee) revert InsufficientBalanceForMessageFee();
+
+        IERC20(token).approve(address(oft), amount);
+        oft.send{value: msgFee.nativeFee}(param, msgFee, msg.sender);
+    }
 
     /**
-     * @dev implements the layerzero receive function to handle inbound messages from other chains
+     * @dev The `_lzSend` requires the msg.sender to pay the fee
+     * This function allows the contract to send a message without the msg.sender paying the fee
+     */
+    function _lzSendFromContract(
+        uint32 dstEid,
+        bytes memory message,
+        bytes memory options,
+        MessagingFee memory msgFee
+    ) internal {
+        endpoint.send{ value: msgFee.nativeFee }(
+            MessagingParams(dstEid, _getPeerOrRevert(dstEid), message, options, msgFee.lzTokenFee > 0),
+            msg.sender
+        );
+    }
+
+    /**
+     * @dev Implements the layerzero receive function to handle inbound messages from other chains
      */
     function _lzReceive(
         Origin calldata /*_origin*/,
@@ -315,9 +382,16 @@ contract CumulativeMerkleDrop is
             emit MerkleRootUpdated(merkleRoot, merkleRoot_);
             merkleRoot = merkleRoot_;
         } else {
-            // TODO: maybe revert is not the best option here
             revert("Invalid message type");
         }
+    }
+
+    function setMaxBatchSize(uint256 _maxBatchSize) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        maxBatchSize = _maxBatchSize;
+    }
+
+    function getPeerGasLimit(uint32 eid) public view returns (uint128) {
+        return uint128(peerToGasLimit.get(uint256(eid)));
     }
 
     /**
@@ -328,4 +402,6 @@ contract CumulativeMerkleDrop is
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
+
+    receive() external payable {}
 }

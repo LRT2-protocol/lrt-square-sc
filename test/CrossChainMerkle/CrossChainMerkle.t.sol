@@ -32,7 +32,7 @@ contract CrossChainMerkle is Test {
 
     function setUp() public {
         // create a fork at block 21896150
-        vm.createSelectFork("https://mainnet.gateway.tenderly.co", currentBlock);
+        vm.createSelectFork("https://eth-mainnet.public.blastapi.io", currentBlock);
         cumulativeMerkleDrop = CumulativeMerkleDrop(payable(cumulativeMerkle));
 
         vm.startPrank(kingProtocolOwner);
@@ -41,7 +41,7 @@ contract CrossChainMerkle is Test {
 
         CumulativeMerkleDrop(payable(cumulativeMerkle)).upgradeToAndCall(cumulativeMerkleDropImpl, "");
 
-        cumulativeMerkleDrop.initializeLayerZero();
+        cumulativeMerkleDrop.initializeLayerZero(100);
 
         // cumulativeMerkleDrop.setDelegate(kingProtocolOwner);
 
@@ -80,27 +80,27 @@ contract CrossChainMerkle is Test {
 
         vm.expectRevert(CumulativeMerkleDrop.InvalidChain.selector);
         cumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
-
-        vm.stopPrank();
     }
 
     function test_BatchSwitchChain() public {
         startHoax(kingProtocolOwner);
+        address(cumulativeMerkleDrop).call{value: 1 ether}("");
 
         address[] memory users = new address[](2);
         users[0] = user1;
         users[1] = user2;
 
-        MessagingFee memory msgFee = cumulativeMerkleDrop.quoteBatchSetClaimEid(30335, 2);
-
-        cumulativeMerkleDrop.batchSetClaimEid{value: msgFee.nativeFee}(users, 30335, msgFee);
+        cumulativeMerkleDrop.batchSetClaimEid(users, 30335);
 
         vm.expectRevert(CumulativeMerkleDrop.InvalidChain.selector);
         cumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
         vm.expectRevert(CumulativeMerkleDrop.InvalidChain.selector);
         cumulativeMerkleDrop.claim(user2, user2CumulativeAmount, currentMerkleRoot, proof2);
 
-        vm.stopPrank();
+        cumulativeMerkleDrop.setMaxBatchSize(1);
+
+        vm.expectRevert(CumulativeMerkleDrop.MaxBatchSizeExceeded.selector);
+        cumulativeMerkleDrop.batchSetClaimEid(users, 30335);
     }
 
     function test_ReceiveChainSwitch() public {
@@ -141,12 +141,16 @@ contract CrossChainMerkle is Test {
     }
 
     function test_PropagateMerkleRoot() public {
-        startHoax(kingProtocolOwner); 
+        startHoax(kingProtocolOwner);
 
-        MessagingFee memory msgFee = cumulativeMerkleDrop.quotePropagateMerkleRoot(30335);
-        cumulativeMerkleDrop.propagateMerkleRoot{value: msgFee.nativeFee}(30335, msgFee);
+        address(cumulativeMerkleDrop).call{value: 0.0000001 ether}("");
+        vm.expectRevert(CumulativeMerkleDrop.InsufficientBalanceForMessageFee.selector);
+        cumulativeMerkleDrop.propagateMerkleRoot();
+
+        address(cumulativeMerkleDrop).call{value: 1 ether}("");
+        cumulativeMerkleDrop.propagateMerkleRoot();
+
         vm.stopPrank();
-
         // random merkle root
         bytes32 newMerkleRoot = 0x7465737400000000000000000000000000000000000000000000000000000000;
         bytes memory message = CumulativeMerkleCodec.encodeMerkleRoot(newMerkleRoot);
@@ -164,14 +168,30 @@ contract CrossChainMerkle is Test {
 
         vm.expectRevert(ICumulativeMerkleDrop.MerkleRootWasUpdated.selector);
         cumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
+
+        // propagate merkle root to multiple peers
+        vm.startPrank(kingProtocolOwner);
+        cumulativeMerkleDrop.addChain(30184, 300_000, toBytes32(cumulativeMerkle));
+
+        vm.expectEmit(true, true, true, true);
+        emit CumulativeMerkleDrop.MerkleRootPropagated(30335, newMerkleRoot);
+        vm.expectEmit(true, true, true, true);
+        emit CumulativeMerkleDrop.MerkleRootPropagated(30184, newMerkleRoot);
+        cumulativeMerkleDrop.propagateMerkleRoot();
+
+        // test peer removal
+        cumulativeMerkleDrop.removeChain(30184);
+
+        vm.expectEmit(true, true, true, true);
+        emit CumulativeMerkleDrop.MerkleRootPropagated(30335, newMerkleRoot);
+        cumulativeMerkleDrop.propagateMerkleRoot();
     }
 
     function test_TopUpPeer() public {
         startHoax(kingProtocolOwner);
+        address(cumulativeMerkleDrop).call{value: 1 ether}("");
 
-        MessagingFee memory msgFee = MessagingFee({nativeFee: 0.1 ether, lzTokenFee: 0});
-        cumulativeMerkleDrop.topUpPeer{value: msgFee.nativeFee}(30335, 10 ether, msgFee);
-        vm.stopPrank();
+        cumulativeMerkleDrop.topUpPeer(30335, 10 ether);
     }
 
     address swellLZEndpoint = 0xcb566e3B6934Fa77258d68ea18E931fa75e1aaAa;
@@ -183,7 +203,7 @@ contract CrossChainMerkle is Test {
         startHoax(kingProtocolOwner);
 
         address swellCumulativeMerkleDropImpl = address(new CumulativeMerkleDrop(swellKingToken, swellLZEndpoint, oftAdapter));
-        CumulativeMerkleDrop swellCumulativeMerkleDrop = CumulativeMerkleDrop(address(
+        CumulativeMerkleDrop swellCumulativeMerkleDrop = CumulativeMerkleDrop(payable(address(
             new UUPSProxy(
                 swellCumulativeMerkleDropImpl,
                 abi.encodeWithSelector(
@@ -193,11 +213,12 @@ contract CrossChainMerkle is Test {
                     kingProtocolOwner
                 )
             )
-        ));
-        swellCumulativeMerkleDrop.initializeLayerZero();
+        )));
+        swellCumulativeMerkleDrop.initializeLayerZero(100);
         swellCumulativeMerkleDrop.addChain(30101, 300_000, toBytes32(cumulativeMerkle));
 
         deal(swellKingToken, address(swellCumulativeMerkleDrop), 1000 ether);
+        payable(swellCumulativeMerkleDrop).transfer(1 ether);
 
         bytes memory message = CumulativeMerkleCodec.encodeMerkleRoot(currentMerkleRoot);
         vm.startPrank(swellLZEndpoint);
@@ -217,8 +238,7 @@ contract CrossChainMerkle is Test {
 
         startHoax(kingProtocolOwner);
 
-        MessagingFee memory msgFee = MessagingFee({nativeFee: 0.1 ether, lzTokenFee: 0});
-        swellCumulativeMerkleDrop.topUpPeer{value: msgFee.nativeFee}(30101, 10 ether, msgFee);
+        swellCumulativeMerkleDrop.topUpPeer(30101, 10 ether);
     }
 
     function toBytes32(address addressValue) internal pure returns (bytes32) {

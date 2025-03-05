@@ -19,7 +19,7 @@ contract DeployCumulativeMerkleDrop is Utils {
         ChainConfig memory config = getChainConfig(vm.toString(block.chainid));
 
         address cumulativeMerkleDropImpl = address(new CumulativeMerkleDrop(lrt2, lzEndpoint, oftAdapter));
-        CumulativeMerkleDrop cumulativeMerkleDrop = CumulativeMerkleDrop(address(
+        CumulativeMerkleDrop cumulativeMerkleDrop = CumulativeMerkleDrop(payable(address(
             new UUPSProxy(
                 cumulativeMerkleDropImpl,
                 abi.encodeWithSelector(
@@ -29,7 +29,7 @@ contract DeployCumulativeMerkleDrop is Utils {
                     config.cumulativeDropPauser
                 )
             )
-        ));
+        )));
 
         vm.stopBroadcast();
     }
