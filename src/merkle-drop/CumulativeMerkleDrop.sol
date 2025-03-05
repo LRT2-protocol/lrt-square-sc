@@ -208,7 +208,7 @@ contract CumulativeMerkleDrop is
      * @notice Quotes the LayerZero fee the user will pay to send the LZ message to change their claim chain
      */
     function quoteSetClaimEid(uint32 dstEid) external view returns (MessagingFee memory msgFee) {
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(uint128(peerToGasLimit.get(uint256(dstEid))), 0);
+        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(getPeerGasLimit(dstEid), 0);
 
         return _quote(dstEid, CumulativeMerkleCodec.encodeSingle(address(0), 0), options, false);
     }
