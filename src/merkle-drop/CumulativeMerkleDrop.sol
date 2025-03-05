@@ -277,9 +277,12 @@ contract CumulativeMerkleDrop is
     }
 
     /**
-     * @notice Propagates the current merkle root to all the peers
+     * @notice set merkle root and propagate to all peers
      */
-    function propagateMerkleRoot() external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setAndPropagateMerkleRoot(bytes32 merkleRoot_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+
+        merkleRoot = merkleRoot_;
+        emit MerkleRootUpdated(merkleRoot, merkleRoot_);
 
         bytes memory message = CumulativeMerkleCodec.encodeMerkleRoot(merkleRoot);
         
