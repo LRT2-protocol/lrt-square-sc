@@ -59,6 +59,7 @@ contract CumulativeMerkleDrop is
     }
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant SET_CLAIM_ADMIN_ROLE = keccak256("SET_CLAIM_ADMIN_ROLE");
 
     // solhint-disable-next-line immutable-vars-naming
     address public immutable override token;
@@ -254,7 +255,7 @@ contract CumulativeMerkleDrop is
      * @dev Due to the complexity of estimating the gas required for this dynamic batch operation, the gas is not provided on the source chain
      * Once the message is delivered, the payload will need be manually executed on the destination chain
      */
-    function batchSetClaimEid(address[] calldata accounts, uint32 dstEid) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function batchSetClaimEid(address[] calldata accounts, uint32 dstEid) external onlyRole(SET_CLAIM_ADMIN_ROLE) {
         if (accounts.length > maxBatchSize) revert MaxBatchSizeExceeded();
 
         MessagingFee memory msgFee = quoteBatchSetClaimEid(dstEid, accounts.length);

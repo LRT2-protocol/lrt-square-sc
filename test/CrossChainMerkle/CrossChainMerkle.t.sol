@@ -51,6 +51,8 @@ contract CrossChainMerkle is Test {
             getDVNConfig()
         );
 
+        cumulativeMerkleDrop.grantRole(cumulativeMerkleDrop.SET_CLAIM_ADMIN_ROLE(), kingProtocolOwner);
+
         vm.stopPrank();
 
         string memory root = vm.projectRoot();
