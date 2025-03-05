@@ -1,3 +1,17 @@
+## 👑 LRT² → KING Protocol 🚀
+
+> #### 🎉 We’ve rebranded! **LRT² (LRT Square)** is now **KING Protocol**!
+> **Why?** Because we’re evolving. New name, bigger vision, same commitment to pioneering the future of restaking in DeFi.
+
+King Protocol is the next step in restaking rewards—streamlining rewards aggregation and enhancing liquidity for stakers across the ecosystem.
+
+🔗 **[New repo is live! Switch your origin to:](https://github.com/king-protocol/king-protocol-sc)**  
+```sh
+git remote set-url origin https://github.com/king-protocol/king-protocol-sc.git
+```
+
+Thank you for being part of the journey. Let’s build the future of DeFi together! 🚀✨
+
 ## LRT<sup>2</sup>
 
 AVSs can distribute the restaking rewards in any ERC20 token. However, most of users will receive small, fractional amounts (more trouble than they’re worth to claim or trade in swap pools). It can lead to frustrating experiences and poor returns for stakers, while AVS may see a low token utilization and increased selling pressure.
