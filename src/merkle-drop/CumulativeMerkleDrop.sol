@@ -189,7 +189,7 @@ contract CumulativeMerkleDrop is
     }
 
     /**
-     *  @notice Admin function to add a new chain to the mesh network. Can also be used to update the peer address or the gas limit for an existing peer
+     *  @notice Adds a new chain to the mesh network. Can also be used to update the peer address or the gas limit for an existing peer
      */
     function addChain(uint32 eid, uint128 singleMessageGasLimit, bytes32 peer) external onlyRole(DEFAULT_ADMIN_ROLE) {
         setPeer(eid, peer);
@@ -197,7 +197,7 @@ contract CumulativeMerkleDrop is
     }
 
     /**
-     * @notice Admin function to remove a chain from the mesh network
+     * @notice Removes a chain from the mesh network
      */
     function removeChain(uint32 eid) external onlyRole(DEFAULT_ADMIN_ROLE) {
         setPeer(eid, bytes32(0));
@@ -208,18 +208,16 @@ contract CumulativeMerkleDrop is
      * @notice Quotes the LayerZero fee the user will pay to send the LZ message to change their claim chain
      */
     function quoteSetClaimEid(uint32 dstEid) external view returns (MessagingFee memory msgFee) {
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(getPeerGasLimit(dstEid), 0);
 
-        return _quote(dstEid, CumulativeMerkleCodec.encodeSingle(address(0), 0), options, false);
+        return _quote(dstEid, CumulativeMerkleCodec.encodeSingle(address(0), 0), getExecutorReceiveOptions(dstEid), false);
     }
 
     /**
      * @notice Quotes the LayerZero fee this contract will pay to send the merkle root to a specific peer
      */
     function quotePropagateMerkleRoot(uint32 dstEid) public view returns (MessagingFee memory msgFee) {
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(getPeerGasLimit(dstEid), 0);
 
-        return _quote(dstEid, CumulativeMerkleCodec.encodeMerkleRoot(merkleRoot), options, false);
+        return _quote(dstEid, CumulativeMerkleCodec.encodeMerkleRoot(merkleRoot), getExecutorReceiveOptions(dstEid), false);
     }
 
     /**
@@ -229,9 +227,8 @@ contract CumulativeMerkleDrop is
      */
     function quoteBatchSetClaimEid(uint32 dstEid, uint256 numAccounts) public view returns (MessagingFee memory msgFee) {    
         bytes memory message = CumulativeMerkleCodec.encodeBatch(new address[](numAccounts), new uint256[](numAccounts));
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(getPeerGasLimit(dstEid), 0);
 
-        return _quote(dstEid, message, options, false);
+        return _quote(dstEid, message, getExecutorReceiveOptions(dstEid), false);
     }
     
     /**
@@ -246,15 +243,14 @@ contract CumulativeMerkleDrop is
 
         setClaimEid(msg.sender, dstEid);
         bytes memory message = CumulativeMerkleCodec.encodeSingle(msg.sender, cumulativeClaimed[msg.sender]);
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(getPeerGasLimit(dstEid), 0);
 
-        _lzSend(dstEid, message, options, msgFee, msg.sender);
+        _lzSend(dstEid, message, getExecutorReceiveOptions(dstEid), msgFee, msg.sender);
 
         emit ClaimEidUpdated(msg.sender, dstEid);
     }
 
     /**
-     * @notice Admin function to change the claim chain on behalf of multiple users
+     * @notice Changes the claim chain on behalf of multiple users
      * @dev Due to the complexity of estimating the gas required for this dynamic batch operation, the gas is not provided on the source chain
      * Once the message is delivered, the payload will need be manually executed on the destination chain
      */
@@ -274,15 +270,14 @@ contract CumulativeMerkleDrop is
         }
 
         bytes memory message = CumulativeMerkleCodec.encodeBatch(accounts, amounts);
-        bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(getPeerGasLimit(dstEid), 0);
 
-        _lzSendFromContract(dstEid, message, options, msgFee);
+        _lzSendFromContract(dstEid, message, getExecutorReceiveOptions(dstEid), msgFee);
 
         emit ClaimEidUpdatedBatched(dstEid);
     }
 
     /**
-     * @notice Admin function to propagate the current merkle root to all the peers
+     * @notice Propagates the current merkle root to all the peers
      */
     function propagateMerkleRoot() external onlyRole(DEFAULT_ADMIN_ROLE) {
 
@@ -296,8 +291,7 @@ contract CumulativeMerkleDrop is
             MessagingFee memory msgFee = quotePropagateMerkleRoot(dstEid);
             if (address(this).balance < msgFee.nativeFee) revert InsufficientBalanceForMessageFee();
 
-            bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(getPeerGasLimit(dstEid), 0);
-            _lzSendFromContract(dstEid, message, options, msgFee);
+            _lzSendFromContract(dstEid, message, getExecutorReceiveOptions(dstEid), msgFee);
             emit MerkleRootPropagated(dstEid, merkleRoot);
         }
     }
@@ -317,7 +311,7 @@ contract CumulativeMerkleDrop is
             to: peer,
             amountLD: amount,
             minAmountLD: (amount),
-            extraOptions: OptionsBuilder.newOptions().addExecutorLzReceiveOption(200_000, 0),
+            extraOptions: getExecutorReceiveOptions(dstEid),
             composeMsg: "",
             oftCmd: ""
         });
@@ -382,7 +376,7 @@ contract CumulativeMerkleDrop is
     }
 
     /**
-     * @dev Custom getter and setter for the claim where default 0 value represent the mainnet eid
+     * @dev Custom getter and setter for the `claimEid` mapping where default 0 value represent the mainnet eid
      */
     function getClaimEid(address user) public view returns (uint32) {
         if (claimEid[user] == 0) {
@@ -407,8 +401,11 @@ contract CumulativeMerkleDrop is
         maxBatchSize = _maxBatchSize;
     }
 
-    function getPeerGasLimit(uint32 eid) public view returns (uint128) {
-        return uint128(peerToGasLimit.get(uint256(eid)));
+    /**
+     * @dev Encodes the gas amount allocated for executing a single message on this destination chain into a LayerZero options bytes array
+     */
+    function getExecutorReceiveOptions(uint32 eid) public view returns (bytes memory options) {
+        return OptionsBuilder.newOptions().addExecutorLzReceiveOption(uint128(peerToGasLimit.get(uint256(eid))), 0);
     }
 
     /**
