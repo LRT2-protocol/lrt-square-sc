@@ -148,26 +148,22 @@ contract CrossChainMerkle is Test {
     function test_PropagateMerkleRoot() public {
         startHoax(kingProtocolOwner);
 
-        address(cumulativeMerkleDrop).call{value: 0.0000001 ether}("");
-        vm.expectRevert(CumulativeMerkleDrop.InsufficientBalanceForMessageFee.selector);
-        cumulativeMerkleDrop.propagateMerkleRoot();
-
-        address(cumulativeMerkleDrop).call{value: 1 ether}("");
-        cumulativeMerkleDrop.propagateMerkleRoot();
-
-        vm.stopPrank();
         // random merkle root
         bytes32 newMerkleRoot = 0x7465737400000000000000000000000000000000000000000000000000000000;
+
+        address(cumulativeMerkleDrop).call{value: 0.0000001 ether}("");
+        vm.expectRevert(CumulativeMerkleDrop.InsufficientBalanceForMessageFee.selector);
+        cumulativeMerkleDrop.setAndPropagateMerkleRoot(newMerkleRoot);
+
+        address(cumulativeMerkleDrop).call{value: 1 ether}("");
+        cumulativeMerkleDrop.setAndPropagateMerkleRoot(newMerkleRoot);
+
+        vm.stopPrank();
+
         bytes memory message = CumulativeMerkleCodec.encodeMerkleRoot(newMerkleRoot);
         vm.prank(lzEndpoint);
         Origin memory origin = Origin({srcEid: 30335, sender: toBytes32(cumulativeMerkle), nonce: 1});
-        cumulativeMerkleDrop.lzReceive(
-            origin,
-            bytes32(0x0),
-            message,
-            address(0),
-            abi.encode(1)
-        );
+        cumulativeMerkleDrop.lzReceive( origin, bytes32(0x0), message, address(0), abi.encode(1));
 
         assertEq(cumulativeMerkleDrop.merkleRoot(), newMerkleRoot);
 
@@ -182,14 +178,14 @@ contract CrossChainMerkle is Test {
         emit CumulativeMerkleDrop.MerkleRootPropagated(30335, newMerkleRoot);
         vm.expectEmit(true, true, true, true);
         emit CumulativeMerkleDrop.MerkleRootPropagated(30184, newMerkleRoot);
-        cumulativeMerkleDrop.propagateMerkleRoot();
+        cumulativeMerkleDrop.setAndPropagateMerkleRoot(newMerkleRoot);
 
         // test peer removal
         cumulativeMerkleDrop.removeChain(30184);
 
         vm.expectEmit(true, true, true, true);
         emit CumulativeMerkleDrop.MerkleRootPropagated(30335, newMerkleRoot);
-        cumulativeMerkleDrop.propagateMerkleRoot();
+        cumulativeMerkleDrop.setAndPropagateMerkleRoot(newMerkleRoot);
     }
 
     function test_TopUpPeer() public {
@@ -223,7 +219,7 @@ contract CrossChainMerkle is Test {
         swellCumulativeMerkleDrop.addChain(30101, 300_000, toBytes32(cumulativeMerkle));
 
         deal(swellKingToken, address(swellCumulativeMerkleDrop), 1000 ether);
-        payable(swellCumulativeMerkleDrop).transfer(1 ether);
+        address(swellCumulativeMerkleDrop).call{value: 1 ether}("");
 
         bytes memory message = CumulativeMerkleCodec.encodeMerkleRoot(currentMerkleRoot);
         vm.startPrank(swellLZEndpoint);

@@ -2,8 +2,8 @@
 pragma solidity ^0.8.0;
 
 library CumulativeMerkleCodec {
-    uint8 constant TYPE_SINGLE = 1;
-    uint8 constant TYPE_BATCH = 2;
+    uint8 constant TYPE_SINGLE_CLAIM_DATA = 1;
+    uint8 constant TYPE_BATCH_CLAIM_DATA = 2;
     uint8 constant TYPE_MERKLE_ROOT = 3;
     
     struct claimMessage {
@@ -21,7 +21,7 @@ library CumulativeMerkleCodec {
      * @param amount The amount
      */
     function encodeSingle(address addr, uint256 amount) internal pure returns (bytes memory) {
-        return abi.encode(TYPE_SINGLE, addr, amount);
+        return abi.encode(TYPE_SINGLE_CLAIM_DATA, addr, amount);
     }
     
     /**
@@ -31,7 +31,7 @@ library CumulativeMerkleCodec {
      */
     function encodeBatch(address[] memory addrs, uint256[] memory amounts) internal pure returns (bytes memory) {
         require(addrs.length == amounts.length, "Length mismatch");
-        return abi.encode(TYPE_BATCH, addrs, amounts);
+        return abi.encode(TYPE_BATCH_CLAIM_DATA, addrs, amounts);
     }
 
     /**

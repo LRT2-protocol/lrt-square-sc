@@ -71,7 +71,7 @@ contract CumulativeMerkleDrop is
     /// @dev should only be accessed through the custom getter and setter
     mapping(address => uint32) private claimEid;
 
-    /// @notice Enumerable map of peer chain eids to the gas limit required to execute a single message `TYPE_SINGLE` or `TYPE_MERKLE_ROOT`
+    /// @notice Enumerable map of peer chain eids to the gas limit required to execute a single message `TYPE_SINGLE_CLAIM_DATA` or `TYPE_MERKLE_ROOT`
     /// @dev Utilized to iterate over all the peers to propagate messages to the entire mesh network
     EnumerableMap.UintToUintMap private peerToGasLimit;
 
@@ -277,9 +277,12 @@ contract CumulativeMerkleDrop is
     }
 
     /**
-     * @notice Propagates the current merkle root to all the peers
+     * @notice set merkle root and propagate to all peers
      */
-    function propagateMerkleRoot() external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setAndPropagateMerkleRoot(bytes32 merkleRoot_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+
+        merkleRoot = merkleRoot_;
+        emit MerkleRootUpdated(merkleRoot, merkleRoot_);
 
         bytes memory message = CumulativeMerkleCodec.encodeMerkleRoot(merkleRoot);
         
@@ -353,12 +356,12 @@ contract CumulativeMerkleDrop is
 
         uint32 newClaimEid = endpoint.eid();
 
-        if (messageType == CumulativeMerkleCodec.TYPE_SINGLE) {
+        if (messageType == CumulativeMerkleCodec.TYPE_SINGLE_CLAIM_DATA) {
             (address user, uint256 amount) = CumulativeMerkleCodec.decodeSingle(_message);
 
             setClaimEid(user, newClaimEid);
             cumulativeClaimed[user] = amount;
-        } else if (messageType == CumulativeMerkleCodec.TYPE_BATCH) {
+        } else if (messageType == CumulativeMerkleCodec.TYPE_BATCH_CLAIM_DATA) {
             (address[] memory users, uint256[] memory amounts) = CumulativeMerkleCodec.decodeBatch(_message);
 
             for (uint256 i = 0; i < users.length; i++) {
