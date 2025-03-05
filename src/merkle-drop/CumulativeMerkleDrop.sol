@@ -78,11 +78,15 @@ contract CumulativeMerkleDrop is
     
     uint256 public maxBatchSize;
 
+    /// @dev Enable users ability to switch their claim chain
+    bool public isUserChainSwitchingEnabled;
+
     error InvalidChain();
     /// @dev This contract is designed to pay the cross chain message fee. Contract needs to be funded if this error is thrown
     error InsufficientBalanceForMessageFee();
     /// @dev Enforce a max batch size to prevent messages from being sent that are too large to be executed on the destination chain
     error MaxBatchSizeExceeded();
+    error UserChainSwitchingDisabled();
 
     event ClaimEidUpdated(address indexed account, uint32 newChain);
     event ClaimEidUpdatedBatched(uint32 newChain);
@@ -122,11 +126,7 @@ contract CumulativeMerkleDrop is
         if (merkleRoot != expectedMerkleRoot) revert MerkleRootWasUpdated();
 
         // Verify the claim chain
-        if (block.chainid == 1) {
-            if (claimEid[account] != 0) revert InvalidChain();
-        } else {
-            if (claimEid[account] != endpoint.eid()) revert InvalidChain();
-        }
+        if (!verifyClaimChain(account)) revert InvalidChain();
 
         // Verify the merkle proof
         if (!verify(account, cumulativeAmount, expectedMerkleRoot, merkleProof))
@@ -238,7 +238,11 @@ contract CumulativeMerkleDrop is
      * @notice User function to change their claim chain
      */
     function setClaimEid(uint32 dstEid, MessagingFee memory msgFee) external payable {
+        if (!isUserChainSwitchingEnabled) revert UserChainSwitchingDisabled();
         if (dstEid == endpoint.eid()) revert InvalidChain();
+
+        // messages to change the claim chain can only be sent from the current claim chain
+        if (!verifyClaimChain(msg.sender)) revert InvalidChain();
 
         claimEid[msg.sender] = dstEid;
         bytes memory message = CumulativeMerkleCodec.encodeSingle(msg.sender, cumulativeClaimed[msg.sender]);
@@ -262,6 +266,9 @@ contract CumulativeMerkleDrop is
 
         uint256[] memory amounts = new uint256[](accounts.length);
         for (uint256 i = 0; i < accounts.length; i++) {
+            // messages to change the claim chain can only be sent from the current claim chain
+            if (!verifyClaimChain(accounts[i])) revert InvalidChain();
+
             claimEid[accounts[i]] = dstEid;
             amounts[i] = cumulativeClaimed[accounts[i]];
         }
@@ -375,6 +382,18 @@ contract CumulativeMerkleDrop is
         } else {
             revert("Invalid message type");
         }
+    }
+
+    function verifyClaimChain(address user) public view returns (bool) {
+        if (block.chainid == 1) {
+            return claimEid[user] == 0;
+        } else {
+            return claimEid[user] == endpoint.eid();
+        }
+    }
+
+    function setUserChainSwitchingEnabled(bool _isUserChainSwitchingEnabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        isUserChainSwitchingEnabled = _isUserChainSwitchingEnabled;
     }
 
     function setMaxBatchSize(uint256 _maxBatchSize) external onlyRole(DEFAULT_ADMIN_ROLE) {

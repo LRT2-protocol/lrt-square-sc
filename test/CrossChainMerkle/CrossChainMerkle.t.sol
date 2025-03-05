@@ -68,12 +68,18 @@ contract CrossChainMerkle is Test {
         cumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
         cumulativeMerkleDrop.claim(user2, user2CumulativeAmount, currentMerkleRoot, proof2);
     }
-
+    
     function test_SwitchChain() public {
-        vm.startPrank(user1);
-
         MessagingFee memory msgFee = cumulativeMerkleDrop.quoteSetClaimEid(30335);
+        
+        vm.expectRevert(CumulativeMerkleDrop.UserChainSwitchingDisabled.selector);
+        vm.prank(user1);
+        cumulativeMerkleDrop.setClaimEid{value: msgFee.nativeFee}(30335, msgFee);
 
+        vm.prank(kingProtocolOwner);
+        cumulativeMerkleDrop.setUserChainSwitchingEnabled(true);
+
+        vm.prank(user1);
         cumulativeMerkleDrop.setClaimEid{value: msgFee.nativeFee}(30335, msgFee);
 
         vm.expectRevert(CumulativeMerkleDrop.InvalidChain.selector);
@@ -99,6 +105,7 @@ contract CrossChainMerkle is Test {
 
         vm.expectRevert(CumulativeMerkleDrop.MaxBatchSizeExceeded.selector);
         cumulativeMerkleDrop.batchSetClaimEid(users, 30335);
+        vm.stopPrank();
     }
 
     function test_ReceiveChainSwitch() public {
