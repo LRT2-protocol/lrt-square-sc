@@ -109,7 +109,7 @@ contract CumulativeMerkleDrop is
     }
 
     function initializeLayerZero(uint256 _maxBatchSize) external reinitializer(2) {
-        __OAppCore_init_unchained(owner());
+        __OAppCore_init(owner());
         maxBatchSize = _maxBatchSize;
     }
 
@@ -385,6 +385,7 @@ contract CumulativeMerkleDrop is
             return claimEid[user];
         }
     }
+
     function setClaimEid(address user, uint32 eid) internal {
         if (eid == 30101) {
             claimEid[user] = 0;
