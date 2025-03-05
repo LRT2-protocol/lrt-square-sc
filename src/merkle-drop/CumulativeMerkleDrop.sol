@@ -67,8 +67,9 @@ contract CumulativeMerkleDrop is
     mapping(address => uint256) public cumulativeClaimed;
 
     /// @notice Maps user addresses to their designated claim chain eid
-    /// @dev Default 0 value represent to mainnet
-    mapping(address => uint32) public claimEid;
+    /// @dev We use the default 0 value to represent the mainnet eid
+    /// @dev should only be accessed through the custom getter and setter
+    mapping(address => uint32) private claimEid;
 
     /// @notice Enumerable map of peer chain eids to the gas limit required to execute a single message `TYPE_SINGLE` or `TYPE_MERKLE_ROOT`
     /// @dev Utilized to iterate over all the peers to propagate messages to the entire mesh network
@@ -126,11 +127,10 @@ contract CumulativeMerkleDrop is
         if (merkleRoot != expectedMerkleRoot) revert MerkleRootWasUpdated();
 
         // Verify the claim chain
-        if (!verifyClaimChain(account)) revert InvalidChain();
+        if (endpoint.eid() != getClaimEid(account)) revert InvalidChain();
 
         // Verify the merkle proof
-        if (!verify(account, cumulativeAmount, expectedMerkleRoot, merkleProof))
-            revert InvalidProof();
+        if (!verify(account, cumulativeAmount, expectedMerkleRoot, merkleProof)) revert InvalidProof();
 
         // Mark it claimed
         uint256 preclaimed = cumulativeClaimed[account];
@@ -242,9 +242,9 @@ contract CumulativeMerkleDrop is
         if (dstEid == endpoint.eid()) revert InvalidChain();
 
         // messages to change the claim chain can only be sent from the current claim chain
-        if (!verifyClaimChain(msg.sender)) revert InvalidChain();
+        if (endpoint.eid() != getClaimEid(msg.sender)) revert InvalidChain();
 
-        claimEid[msg.sender] = dstEid;
+        setClaimEid(msg.sender, dstEid);
         bytes memory message = CumulativeMerkleCodec.encodeSingle(msg.sender, cumulativeClaimed[msg.sender]);
         bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(getPeerGasLimit(dstEid), 0);
 
@@ -267,9 +267,9 @@ contract CumulativeMerkleDrop is
         uint256[] memory amounts = new uint256[](accounts.length);
         for (uint256 i = 0; i < accounts.length; i++) {
             // messages to change the claim chain can only be sent from the current claim chain
-            if (!verifyClaimChain(accounts[i])) revert InvalidChain();
+            if (endpoint.eid() != getClaimEid(accounts[i])) revert InvalidChain();
 
-            claimEid[accounts[i]] = dstEid;
+            setClaimEid(accounts[i], dstEid);
             amounts[i] = cumulativeClaimed[accounts[i]];
         }
 
@@ -358,20 +358,17 @@ contract CumulativeMerkleDrop is
         uint8 messageType = CumulativeMerkleCodec.decodeType(_message);
 
         uint32 newClaimEid = endpoint.eid();
-        if (block.chainid == 1) {
-            newClaimEid = 0;
-        }
 
         if (messageType == CumulativeMerkleCodec.TYPE_SINGLE) {
             (address user, uint256 amount) = CumulativeMerkleCodec.decodeSingle(_message);
 
-            claimEid[user] = newClaimEid;
+            setClaimEid(user, newClaimEid);
             cumulativeClaimed[user] = amount;
         } else if (messageType == CumulativeMerkleCodec.TYPE_BATCH) {
             (address[] memory users, uint256[] memory amounts) = CumulativeMerkleCodec.decodeBatch(_message);
 
             for (uint256 i = 0; i < users.length; i++) {
-                claimEid[users[i]] = newClaimEid;
+                setClaimEid(users[i], newClaimEid);
                 cumulativeClaimed[users[i]] = amounts[i];
             }
         } else if (messageType == CumulativeMerkleCodec.TYPE_MERKLE_ROOT) {
@@ -384,11 +381,21 @@ contract CumulativeMerkleDrop is
         }
     }
 
-    function verifyClaimChain(address user) public view returns (bool) {
-        if (block.chainid == 1) {
-            return claimEid[user] == 0;
+    /**
+     * @dev Custom getter and setter for the claim where default 0 value represent the mainnet eid
+     */
+    function getClaimEid(address user) public view returns (uint32) {
+        if (claimEid[user] == 0) {
+            return 30101;
         } else {
-            return claimEid[user] == endpoint.eid();
+            return claimEid[user];
+        }
+    }
+    function setClaimEid(address user, uint32 eid) internal {
+        if (eid == 30101) {
+            claimEid[user] = 0;
+        } else {
+            claimEid[user] = eid;
         }
     }
 
