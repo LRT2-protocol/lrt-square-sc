@@ -163,21 +163,12 @@ contract CumulativeMerkleDrop is
         _unpause();
     }
 
-    function _verifyAsm(
-        bytes32[] calldata proof,
-        bytes32 root,
-        bytes32 leaf
-    ) private pure returns (bool valid) {
+    function _verifyAsm(bytes32[] calldata proof, bytes32 root, bytes32 leaf) private pure returns (bool valid) {
         /// @solidity memory-safe-assembly
-        assembly {
-            // solhint-disable-line no-inline-assembly
+        assembly {  // solhint-disable-line no-inline-assembly
             let ptr := proof.offset
 
-            for {
-                let end := add(ptr, mul(0x20, proof.length))
-            } lt(ptr, end) {
-                ptr := add(ptr, 0x20)
-            } {
+            for { let end := add(ptr, mul(0x20, proof.length)) } lt(ptr, end) { ptr := add(ptr, 0x20) } {
                 let node := calldataload(ptr)
 
                 switch lt(leaf, node)
@@ -198,7 +189,7 @@ contract CumulativeMerkleDrop is
     }
 
     /**
-     *  @notice Adds a new chain or updates the peer address or the gas limit for an existing peer chain
+     *  @notice Admin function to add a new chain to the mesh network. Can also be used to update the peer address or the gas limit for an existing peer
      */
     function addChain(uint32 eid, uint128 singleMessageGasLimit, bytes32 peer) external onlyRole(DEFAULT_ADMIN_ROLE) {
         setPeer(eid, peer);
@@ -206,7 +197,7 @@ contract CumulativeMerkleDrop is
     }
 
     /**
-     * @notice Removes a chain from the mesh network
+     * @notice Admin function to remove a chain from the mesh network
      */
     function removeChain(uint32 eid) external onlyRole(DEFAULT_ADMIN_ROLE) {
         setPeer(eid, bytes32(0));

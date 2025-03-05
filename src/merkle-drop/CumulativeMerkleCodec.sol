@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 library CumulativeMerkleCodec {
-    // TODO: take inspiration from the OFTComposeMsgCodec for ways to improve this
     uint8 constant TYPE_SINGLE = 1;
     uint8 constant TYPE_BATCH = 2;
     uint8 constant TYPE_MERKLE_ROOT = 3;

@@ -43,8 +43,6 @@ contract CrossChainMerkle is Test {
 
         cumulativeMerkleDrop.initializeLayerZero(100);
 
-        // cumulativeMerkleDrop.setDelegate(kingProtocolOwner);
-
         cumulativeMerkleDrop.addChain(30335, 300_000, toBytes32(cumulativeMerkle));
 
         IMessageLibManager(lzEndpoint).setConfig(
