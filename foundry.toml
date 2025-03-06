@@ -22,3 +22,4 @@ sepolia = "${SEPOLIA_RPC}"
 [etherscan]
 mainnet = { key = "${MAINNET_ETHERSCAN_KEY}" }
 sepolia = { key = "${MAINNET_ETHERSCAN_KEY}" }
+

@@ -374,14 +374,14 @@ contract CumulativeMerkleDrop is
      */
     function getClaimEid(address user) public view returns (uint32) {
         if (claimEid[user] == 0) {
-            return 30101;
+            return 40161;
         } else {
             return claimEid[user];
         }
     }
 
     function setClaimEid(address user, uint32 eid) internal {
-        if (eid == 30101) {
+        if (eid == 40161) {
             claimEid[user] = 0;
         } else {
             claimEid[user] = eid;
@@ -407,6 +407,12 @@ contract CumulativeMerkleDrop is
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
+
+    // TESTING FUNCTIONS
+
+    function setCumulativeClaimed(address user, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        cumulativeClaimed[user] = amount;
+    }
 
     receive() external payable {}
 }
