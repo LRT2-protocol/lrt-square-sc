@@ -41,7 +41,7 @@ contract CrossChainMerkle is Test {
 
         CumulativeMerkleDrop(payable(cumulativeMerkle)).upgradeToAndCall(cumulativeMerkleDropImpl, "");
 
-        cumulativeMerkleDrop.initializeLayerZero(100);
+        cumulativeMerkleDrop.initializeLayerZero();
 
         cumulativeMerkleDrop.addChain(30335, 300_000, toBytes32(cumulativeMerkle));
 
@@ -51,7 +51,7 @@ contract CrossChainMerkle is Test {
             getDVNConfig()
         );
 
-        cumulativeMerkleDrop.grantRole(cumulativeMerkleDrop.SET_CLAIM_ADMIN_ROLE(), kingProtocolOwner);
+        cumulativeMerkleDrop.grantRole(cumulativeMerkleDrop.OPERATING_ADMIN_ROLE(), kingProtocolOwner);
 
         vm.stopPrank();
 
@@ -103,10 +103,6 @@ contract CrossChainMerkle is Test {
         vm.expectRevert(CumulativeMerkleDrop.InvalidChain.selector);
         cumulativeMerkleDrop.claim(user2, user2CumulativeAmount, currentMerkleRoot, proof2);
 
-        cumulativeMerkleDrop.setMaxBatchSize(1);
-
-        vm.expectRevert(CumulativeMerkleDrop.MaxBatchSizeExceeded.selector);
-        cumulativeMerkleDrop.batchSetClaimEid(users, 30335);
         vm.stopPrank();
     }
 
@@ -147,7 +143,7 @@ contract CrossChainMerkle is Test {
         test_DefaultClaim();
     }
 
-    function test_PropagateMerkleRoot() public {
+    function test_BroadcastMerkleRoot() public {
         startHoax(kingProtocolOwner);
 
         // random merkle root
@@ -155,10 +151,10 @@ contract CrossChainMerkle is Test {
 
         address(cumulativeMerkleDrop).call{value: 0.0000001 ether}("");
         vm.expectRevert(CumulativeMerkleDrop.InsufficientBalanceForMessageFee.selector);
-        cumulativeMerkleDrop.setAndPropagateMerkleRoot(newMerkleRoot);
+        cumulativeMerkleDrop.setAndBroadcastMerkleRoot(newMerkleRoot);
 
         address(cumulativeMerkleDrop).call{value: 1 ether}("");
-        cumulativeMerkleDrop.setAndPropagateMerkleRoot(newMerkleRoot);
+        cumulativeMerkleDrop.setAndBroadcastMerkleRoot(newMerkleRoot);
 
         vm.stopPrank();
 
@@ -172,22 +168,22 @@ contract CrossChainMerkle is Test {
         vm.expectRevert(ICumulativeMerkleDrop.MerkleRootWasUpdated.selector);
         cumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
 
-        // propagate merkle root to multiple peers
+        // broadcast merkle root to multiple peers
         vm.startPrank(kingProtocolOwner);
         cumulativeMerkleDrop.addChain(30184, 300_000, toBytes32(cumulativeMerkle));
 
         vm.expectEmit(true, true, true, true);
-        emit CumulativeMerkleDrop.MerkleRootPropagated(30335, newMerkleRoot);
+        emit CumulativeMerkleDrop.MerkleRootBroadcasted(30335, newMerkleRoot);
         vm.expectEmit(true, true, true, true);
-        emit CumulativeMerkleDrop.MerkleRootPropagated(30184, newMerkleRoot);
-        cumulativeMerkleDrop.setAndPropagateMerkleRoot(newMerkleRoot);
+        emit CumulativeMerkleDrop.MerkleRootBroadcasted(30184, newMerkleRoot);
+        cumulativeMerkleDrop.setAndBroadcastMerkleRoot(newMerkleRoot);
 
         // test peer removal
         cumulativeMerkleDrop.removeChain(30184);
 
         vm.expectEmit(true, true, true, true);
-        emit CumulativeMerkleDrop.MerkleRootPropagated(30335, newMerkleRoot);
-        cumulativeMerkleDrop.setAndPropagateMerkleRoot(newMerkleRoot);
+        emit CumulativeMerkleDrop.MerkleRootBroadcasted(30335, newMerkleRoot);
+        cumulativeMerkleDrop.setAndBroadcastMerkleRoot(newMerkleRoot);
     }
 
     function test_TopUpPeer() public {
@@ -217,7 +213,8 @@ contract CrossChainMerkle is Test {
                 )
             )
         )));
-        swellCumulativeMerkleDrop.initializeLayerZero(100);
+        swellCumulativeMerkleDrop.initializeLayerZero();
+        swellCumulativeMerkleDrop.grantRole(swellCumulativeMerkleDrop.OPERATING_ADMIN_ROLE(), kingProtocolOwner);
         swellCumulativeMerkleDrop.addChain(30101, 300_000, toBytes32(cumulativeMerkle));
 
         deal(swellKingToken, address(swellCumulativeMerkleDrop), 1000 ether);
