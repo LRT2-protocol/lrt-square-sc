@@ -10,28 +10,9 @@ import "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/IMessageLibManage
 import {console} from "forge-std/console.sol";
 
 contract DeploySepoliaMerkleDrop is Script {
-    // These values should be replaced with testnet addresses
-    address constant BASE_SEPOLIA_LZ_ENDPOINT = 0x6EDCE65403992e310A62460808c4b910D972f10f;
-    address constant MAINNET_SEPOLIA_LZ_ENDPOINT = 0x6EDCE65403992e310A62460808c4b910D972f10f;
 
-    address constant BASE_KING_TOKEN = address(0);
-    address constant OFT_ADAPTER = address(0);
-    address constant KING_PROTOCOL_OWNER = 0xD0d7F8a5a86d8271ff87ff24145Cf40CEa9F7A39;
-
-    uint32 constant BASE_SEPOLIA_EID = 40245; 
-    uint32 constant MAINNET_SEPOLIA_EID = 40161;
-
-    address constant MAINNET_MERKLE = 0x5794027bd3aF93218e10C5B9Fc9E1EE338140f5B;
-    address constant BASE_MERKLE = 0xC013bff2a04BE559aC3fD4ee73569470ebb42390;
-
-    address constant BASE_SEPOLIA_SEND_LIB = 0xC1868e054425D378095A003EcbA3823a5D0135C9;
-    address constant BASE_SEPOLIA_RECEIVE_LIB = 0x12523de19dc41c91F7d2093E0CFbB76b17012C8d;
-
-    address constant MAINNET_SEPOLIA_SEND_LIB = 0xcc1ae8Cf5D3904Cef3360A9532B477529b177cCE;
-    address constant MAINNET_SEPOLIA_RECEIVE_LIB = 0xdAf00F5eE2158dD58E0d3857851c432E34A3A851;
 
     // forge script script/cross-chain-merkle-testnet/SepoliaDeployment.s.sol --rpc-url https://eth-sepolia.public.blastapi.io --via-ir
-    // forge script script/cross-chain-merkle-testnet/SepoliaDeployment.s.sol --rpc-url https://sepolia.base.org --via-ir --verify --etherscan-api-key $BASE_ETHERSCAN_KEY --chain-id 84532
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
@@ -42,13 +23,8 @@ contract DeploySepoliaMerkleDrop is Script {
         address DEPLOYMENT_PEER_MERKLE = BASE_MERKLE;
         address DEPLOYMENT_SEND_LIB = MAINNET_SEPOLIA_SEND_LIB;
         address DEPLOYMENT_RECEIVE_LIB = MAINNET_SEPOLIA_RECEIVE_LIB;
-        if (block.chainid == 84532) {
-            DEPLOYMENT_LZ_ENDPOINT = BASE_SEPOLIA_LZ_ENDPOINT;
-            DEPLOYMENT_PEER_EID = MAINNET_SEPOLIA_EID;
-            DEPLOYMENT_PEER_MERKLE = MAINNET_MERKLE;
-            DEPLOYMENT_SEND_LIB = BASE_SEPOLIA_SEND_LIB;
-            DEPLOYMENT_RECEIVE_LIB = BASE_SEPOLIA_RECEIVE_LIB;
-        }
+        address KING_PROTOCOL_OWNER = 0xD0d7F8a5a86d8271ff87ff24145Cf40CEa9F7A39;
+        address BASE_KING
 
         // 1. Deploy implementation
         address implementation = address(
