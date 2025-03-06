@@ -88,6 +88,7 @@ contract CumulativeMerkleDrop is
     event ClaimEidUpdated(address indexed account, uint32 newChain);
     event ClaimEidUpdatedBatched(uint32 newChain);
     event MerkleRootBroadcasted(uint32 newChain, bytes32 newMerkleRoot);
+    event ClaimDataImported(address indexed account, uint256 cumulativeAmount);
     
     constructor(address _token, address _endpoint, address _oftAdapter) OAppUpgradeable(_endpoint) {
         token = _token;
@@ -227,9 +228,9 @@ contract CumulativeMerkleDrop is
     }
     
     /**
-     * @notice User function to change their claim chain
+     * @notice User function to update their claim chain
      */
-    function setClaimEid(uint32 dstEid, MessagingFee memory msgFee) external payable {
+    function updateClaimEid(uint32 dstEid, MessagingFee memory msgFee) external payable {
         if (!isUserChainSwitchingEnabled) revert UserChainSwitchingDisabled();
         if (dstEid == endpoint.eid()) revert InvalidChain();
 
@@ -245,11 +246,11 @@ contract CumulativeMerkleDrop is
     }
 
     /**
-     * @notice Changes the claim chain on behalf of multiple users
+     * @notice Updates the claim chain on behalf of multiple users
      * @dev Due to the complexity of estimating the gas required for this dynamic batch operation, the gas is not provided on the source chain
      * Once the message is delivered, the payload will need be manually executed on the destination chain
      */
-    function batchSetClaimEid(address[] calldata accounts, uint32 dstEid) external onlyRole(OPERATING_ADMIN_ROLE) {
+    function batchUpdateClaimEid(address[] calldata accounts, uint32 dstEid) external onlyRole(OPERATING_ADMIN_ROLE) {
         MessagingFee memory msgFee = quoteBatchSetClaimEid(dstEid, accounts.length);
         if (address(this).balance < msgFee.nativeFee) revert InsufficientBalanceForMessageFee();
 
@@ -352,6 +353,7 @@ contract CumulativeMerkleDrop is
 
             setClaimEid(user, newClaimEid);
             cumulativeClaimed[user] = amount;
+            emit ClaimDataImported(user, amount);
         } else if (messageType == CumulativeMerkleCodec.TYPE_BATCH_CLAIM_DATA) {
             (address[] memory users, uint256[] memory amounts) = CumulativeMerkleCodec.decodeBatch(_message);
 

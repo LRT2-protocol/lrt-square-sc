@@ -76,13 +76,13 @@ contract CrossChainMerkle is Test {
         
         vm.expectRevert(CumulativeMerkleDrop.UserChainSwitchingDisabled.selector);
         vm.prank(user1);
-        cumulativeMerkleDrop.setClaimEid{value: msgFee.nativeFee}(30335, msgFee);
+        cumulativeMerkleDrop.updateClaimEid{value: msgFee.nativeFee}(30335, msgFee);
 
         vm.prank(kingProtocolOwner);
         cumulativeMerkleDrop.setUserChainSwitchingEnabled(true);
 
         vm.prank(user1);
-        cumulativeMerkleDrop.setClaimEid{value: msgFee.nativeFee}(30335, msgFee);
+        cumulativeMerkleDrop.updateClaimEid{value: msgFee.nativeFee}(30335, msgFee);
 
         vm.expectRevert(CumulativeMerkleDrop.InvalidChain.selector);
         cumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
@@ -96,7 +96,7 @@ contract CrossChainMerkle is Test {
         users[0] = user1;
         users[1] = user2;
 
-        cumulativeMerkleDrop.batchSetClaimEid(users, 30335);
+        cumulativeMerkleDrop.batchUpdateClaimEid(users, 30335);
 
         vm.expectRevert(CumulativeMerkleDrop.InvalidChain.selector);
         cumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
