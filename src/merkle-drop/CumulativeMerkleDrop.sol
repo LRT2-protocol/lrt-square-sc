@@ -265,7 +265,7 @@ contract CumulativeMerkleDrop is
 
         bytes memory message = CumulativeMerkleCodec.encodeBatch(accounts, amounts);
 
-        _lzSendFromContractBalance(dstEid, message, getExecutorReceiveOptions(dstEid), msgFee);
+        _lzSendFromContractBalance(dstEid, message, OptionsBuilder.newOptions().addExecutorLzReceiveOption(1, 0), msgFee);
 
         emit ClaimEidUpdatedBatched(dstEid);
     }
