@@ -80,7 +80,6 @@ contract CumulativeMerkleDrop is
     /// @notice The gas limit required to execute a batch message `TYPE_BATCH_CLAIM_DATA`
     uint128 public batchMessageGasLimit;
 
-    /// @notice Enumerable map of peer chain eids to the gas limit required to execute a single message `TYPE_SINGLE_CLAIM_DATA` or `TYPE_MERKLE_ROOT`
     /// @dev Enable users ability to switch their claim chain
     bool public isUserChainSwitchingEnabled;
 
