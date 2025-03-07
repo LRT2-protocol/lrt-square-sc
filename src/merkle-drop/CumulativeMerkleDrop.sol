@@ -77,6 +77,10 @@ contract CumulativeMerkleDrop is
     /// @dev Utilized to iterate over all the peers to broadcast messages to the entire mesh network
     EnumerableMap.UintToUintMap private peerToGasLimit;
 
+    /// @notice The gas limit required to execute a batch message `TYPE_BATCH_CLAIM_DATA`
+    uint128 public batchMessageGasLimit;
+
+    /// @notice Enumerable map of peer chain eids to the gas limit required to execute a single message `TYPE_SINGLE_CLAIM_DATA` or `TYPE_MERKLE_ROOT`
     /// @dev Enable users ability to switch their claim chain
     bool public isUserChainSwitchingEnabled;
 
@@ -105,8 +109,9 @@ contract CumulativeMerkleDrop is
         _grantRole(PAUSER_ROLE, _pauser);
     }
 
-    function initializeLayerZero() external reinitializer(2) {
+    function initializeLayerZero(uint128 _batchMessageGasLimit) external reinitializer(2) {
         __OAppCore_init(owner());
+        batchMessageGasLimit = _batchMessageGasLimit;
     }
 
     function setMerkleRoot(bytes32 merkleRoot_) public onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -247,8 +252,6 @@ contract CumulativeMerkleDrop is
 
     /**
      * @notice Updates the claim chain on behalf of multiple users
-     * @dev Due to the complexity of estimating the gas required for this dynamic batch operation, the gas is not provided on the source chain
-     * Once the message is delivered, the payload will need be manually executed on the destination chain
      */
     function batchUpdateClaimEid(address[] calldata accounts, uint32 dstEid) external onlyRole(OPERATING_ADMIN_ROLE) {
         MessagingFee memory msgFee = quoteBatchSetClaimEid(dstEid, accounts.length);
@@ -265,7 +268,7 @@ contract CumulativeMerkleDrop is
 
         bytes memory message = CumulativeMerkleCodec.encodeBatch(accounts, amounts);
 
-        _lzSendFromContractBalance(dstEid, message, OptionsBuilder.newOptions().addExecutorLzReceiveOption(1, 0), msgFee);
+        _lzSendFromContractBalance(dstEid, message, OptionsBuilder.newOptions().addExecutorLzReceiveOption(batchMessageGasLimit, 0), msgFee);
 
         emit ClaimEidUpdatedBatched(dstEid);
     }
@@ -392,6 +395,10 @@ contract CumulativeMerkleDrop is
 
     function setUserChainSwitchingEnabled(bool _isUserChainSwitchingEnabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
         isUserChainSwitchingEnabled = _isUserChainSwitchingEnabled;
+    }
+
+    function setBatchMessageGasLimit(uint128 gasLimit) external onlyRole(OPERATING_ADMIN_ROLE) {
+        batchMessageGasLimit = gasLimit;
     }
 
     /**
