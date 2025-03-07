@@ -41,7 +41,7 @@ contract CrossChainMerkle is Test {
 
         CumulativeMerkleDrop(payable(cumulativeMerkle)).upgradeToAndCall(cumulativeMerkleDropImpl, "");
 
-        cumulativeMerkleDrop.initializeLayerZero();
+        cumulativeMerkleDrop.initializeLayerZero(1);
 
         cumulativeMerkleDrop.addChain(30335, 300_000, toBytes32(cumulativeMerkle));
 
@@ -213,7 +213,7 @@ contract CrossChainMerkle is Test {
                 )
             )
         )));
-        swellCumulativeMerkleDrop.initializeLayerZero();
+        swellCumulativeMerkleDrop.initializeLayerZero(1);
         swellCumulativeMerkleDrop.grantRole(swellCumulativeMerkleDrop.OPERATING_ADMIN_ROLE(), kingProtocolOwner);
         swellCumulativeMerkleDrop.addChain(30101, 300_000, toBytes32(cumulativeMerkle));
 
