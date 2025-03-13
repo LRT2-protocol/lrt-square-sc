@@ -108,7 +108,7 @@ contract CumulativeMerkleDrop is
         _grantRole(PAUSER_ROLE, _pauser);
     }
 
-    function initializeLayerZero(uint128 _batchMessageGasLimit) external reinitializer(2) {
+    function initializeLayerZero(uint128 _batchMessageGasLimit) external reinitializer(2) onlyRole(DEFAULT_ADMIN_ROLE) {
         __OAppCore_init(owner());
         batchMessageGasLimit = _batchMessageGasLimit;
     }
