@@ -416,5 +416,11 @@ contract CumulativeMerkleDrop is
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 
+    function sweepETH(address payable recipient, uint256 amount) external onlyRole(OPERATING_ADMIN_ROLE) {
+        
+        (bool success, ) = recipient.call{value: amount}("");
+        require(success, "ETH transfer failed");
+    }
+
     receive() external payable {}
 }

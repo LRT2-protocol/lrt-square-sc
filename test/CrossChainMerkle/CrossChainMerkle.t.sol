@@ -106,6 +106,17 @@ contract CrossChainMerkle is Test {
         vm.stopPrank();
     }
 
+    function test_SweepETH() public {
+        test_BatchSwitchChain();
+
+        address receiver = address(vm.addr(1));
+        uint256 balanceBefore = address(receiver).balance;
+        vm.prank(kingProtocolOwner);
+        cumulativeMerkleDrop.sweepETH(payable(receiver), 0.9 ether);
+
+        assertEq(receiver.balance, balanceBefore + 0.9 ether);
+    }
+
     function test_ReceiveChainSwitch() public {
         test_SwitchChain();
 
