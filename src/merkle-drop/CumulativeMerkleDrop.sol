@@ -52,7 +52,6 @@ contract CumulativeMerkleDrop is
     using SafeERC20 for IERC20;
     using OptionsBuilder for bytes;
     using EnumerableMap for EnumerableMap.UintToUintMap;
-    // using MerkleProof for bytes32[];
 
     struct ChainInfo {
         uint128 singleMessageGasLimit;
@@ -92,6 +91,8 @@ contract CumulativeMerkleDrop is
     event ClaimEidUpdatedBatched(uint32 newChain);
     event MerkleRootBroadcasted(uint32 newChain, bytes32 newMerkleRoot);
     event ClaimDataImported(address indexed account, uint256 cumulativeAmount);
+    event ChainAdded(uint32 eid, bytes32 peer, uint128 singleMessageGasLimit);
+    event ChainRemoved(uint32 eid);
     
     constructor(address _token, address _endpoint, address _oftAdapter) OAppUpgradeable(_endpoint) {
         token = _token;
@@ -194,6 +195,8 @@ contract CumulativeMerkleDrop is
     function addChain(uint32 eid, uint128 singleMessageGasLimit, bytes32 peer) external onlyRole(DEFAULT_ADMIN_ROLE) {
         setPeer(eid, peer);
         peerToGasLimit.set(uint256(eid), uint256(singleMessageGasLimit));
+
+        emit ChainAdded(eid, peer, singleMessageGasLimit);
     }
 
     /**
@@ -202,6 +205,8 @@ contract CumulativeMerkleDrop is
     function removeChain(uint32 eid) external onlyRole(DEFAULT_ADMIN_ROLE) {
         setPeer(eid, bytes32(0));
         peerToGasLimit.remove(uint256(eid));
+
+        emit ChainRemoved(eid);
     }
 
     /**
@@ -278,7 +283,7 @@ contract CumulativeMerkleDrop is
     function setAndBroadcastMerkleRoot(bytes32 merkleRoot_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         setMerkleRoot(merkleRoot_);
 
-        bytes memory message = CumulativeMerkleCodec.encodeMerkleRoot(merkleRoot);
+        bytes memory message = CumulativeMerkleCodec.encodeMerkleRoot(merkleRoot_);
         
         // enumerate all the peers and broadcast message
         uint256[] memory allPeers = peerToGasLimit.keys();
@@ -289,7 +294,7 @@ contract CumulativeMerkleDrop is
             if (address(this).balance < msgFee.nativeFee) revert InsufficientBalanceForMessageFee();
 
             _lzSendFromContractBalance(dstEid, message, getExecutorReceiveOptions(dstEid), msgFee);
-            emit MerkleRootBroadcasted(dstEid, merkleRoot);
+            emit MerkleRootBroadcasted(dstEid, merkleRoot_);
         }
     }
 
