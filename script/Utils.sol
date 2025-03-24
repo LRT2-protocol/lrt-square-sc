@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import {Script} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
+import "@layerzerolabs/lz-evm-messagelib-v2/contracts/uln/UlnBase.sol";
+import "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/IMessageLibManager.sol";
 
 struct ChainConfig {
     address owner;
@@ -19,12 +21,25 @@ struct ChainConfig {
     uint48 redeemFeeInBps;
     address cumulativeDropOwner;
     address cumulativeDropPauser;
+    address cumulativeMerkleDrop;
+    address lrt2Token;
+    address oftAdapter;
+    address lzEndpoint;
+    address sendLib;
+    address receiveLib;
+    address lzDVN;
+    address nethermindDVN;
+    uint32 eid;
 }
 
 contract Utils is Script {
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     uint64 public constant HUNDRED_PERCENT_LIMIT = 1_000_000_000;
+    address public constant L2_CREATE3_DEPLOYER = 0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed;
+    address public constant OPERATING_ADMIN_ADDRESS = 0xd8F3803d8412e61e04F53e1C9394e13eC8b32550;
+
+    string[] public chainIds = ["1", "1923", "8453", "42161"];
 
     function getChainConfig(
         string memory chainId
@@ -109,6 +124,51 @@ contract Utils is Script {
             string.concat(".", chainId, ".", "cumulativeDropPauser")
         ));
 
+        config.cumulativeMerkleDrop = address(stdJson.readAddress(
+            inputJson, 
+            string.concat(".", chainId, ".", "cumulativeMerkleDrop")
+        ));
+
+        config.lrt2Token = address(stdJson.readAddress(
+            inputJson, 
+            string.concat(".", chainId, ".", "lrt2Token")
+        ));
+
+        config.oftAdapter = address(stdJson.readAddress(
+            inputJson, 
+            string.concat(".", chainId, ".", "oftAdapter")
+        ));
+
+        config.lzEndpoint = address(stdJson.readAddress(
+            inputJson, 
+            string.concat(".", chainId, ".", "lzEndpoint")
+        ));
+
+        config.sendLib = address(stdJson.readAddress(
+            inputJson, 
+            string.concat(".", chainId, ".", "sendLib")
+        ));
+
+        config.receiveLib = address(stdJson.readAddress(    
+            inputJson, 
+            string.concat(".", chainId, ".", "receiveLib")
+        ));
+
+        config.lzDVN = address(stdJson.readAddress(
+            inputJson, 
+            string.concat(".", chainId, ".", "lzDVN")
+        ));
+
+        config.nethermindDVN = address(stdJson.readAddress(
+            inputJson, 
+            string.concat(".", chainId, ".", "nethermindDVN")
+        ));
+
+        config.eid = uint32(stdJson.readUint(
+            inputJson, 
+            string.concat(".", chainId, ".", "eid")
+        ));
+        
         return config;
     }
 
@@ -146,5 +206,40 @@ contract Utils is Script {
         inputs[8] = vm.toString(amount);
 
         return vm.ffi(inputs);
+    }
+
+    function toBytes32(address addressValue) internal pure returns (bytes32) {
+        return bytes32(uint256(uint160(addressValue)));
+    }
+
+    // Set a base config
+    function getDVNConfig(address lzDVN, address nethermindDVN, uint32 targetEid) internal pure returns (SetConfigParam[] memory) {
+        SetConfigParam[] memory params = new SetConfigParam[](1);
+        address[] memory requiredDVNs = new address[](2);
+        if (lzDVN < nethermindDVN) {
+            requiredDVNs[0] = lzDVN;
+            requiredDVNs[1] = nethermindDVN;
+        } else {
+            requiredDVNs[0] = nethermindDVN;
+            requiredDVNs[1] = lzDVN;
+        }
+
+        UlnConfig memory ulnConfig = UlnConfig({
+            confirmations: 15,
+            requiredDVNCount: 2,
+            optionalDVNCount: 0,
+            optionalDVNThreshold: 0,
+            requiredDVNs: requiredDVNs,
+            optionalDVNs: new address[](0)
+        });
+
+        params[0] = SetConfigParam(targetEid, 2, abi.encode(ulnConfig));
+
+        return params;
+    }
+
+    // Add this helper function for string comparison
+    function stringsEqual(string memory a, string memory b) internal pure returns (bool) {
+        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 }
