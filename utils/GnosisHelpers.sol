@@ -32,9 +32,9 @@ contract GnosisHelpers is Test {
 
     // Create a gnosis transaction
     // ether sent value is always 0 for our usecase
-    function _getGnosisTransaction(string memory to, string memory data, bool isLast) internal pure returns (string memory) {
+    function _getGnosisTransaction(address to, bytes memory data, bool isLast) internal pure returns (string memory) {
         string memory suffix = isLast ? ']}' : ',';
-        return string.concat('{"to":"', to, '","value":"0","data":"', data, '"}', suffix);
+        return string.concat('{"to":"', iToHex(abi.encodePacked(to)), '","value":"0","data":"', iToHex(data), '"}', suffix);
     }
 
     // Helper function to convert bytes to hex strings 
@@ -66,18 +66,15 @@ contract GnosisHelpers is Test {
     // Generates the schedule transaction for a Timelock
     function _getTimelockScheduleTransaction(address to, bytes memory data, bool isLasts) internal pure returns (string memory) {
 
-        string memory timelockAddressHex = iToHex(abi.encodePacked(address(timelock)));
-        string memory scheduleTransactionData = iToHex(abi.encodeWithSignature("schedule(address,uint256,bytes,bytes32,bytes32,uint256)", to, 0, data, predecessor, salt, delay));
+        bytes memory scheduleTransactionData = abi.encodeWithSignature("schedule(address,uint256,bytes,bytes32,bytes32,uint256)", to, 0, data, predecessor, salt, delay);
 
-        return _getGnosisTransaction(timelockAddressHex, scheduleTransactionData, isLasts);
+        return _getGnosisTransaction(timelock, scheduleTransactionData, isLasts);
     }
 
     function _getTimelockExecuteTransaction(address to, bytes memory data, bool isLasts) internal pure returns (string memory) {
 
-        string memory timelockAddressHex = iToHex(abi.encodePacked(address(timelock)));
-        string memory executeTransactionData = iToHex(abi.encodeWithSignature("execute(address,uint256,bytes,bytes32,bytes32)", to, 0, data, predecessor, salt));
+        bytes memory executeTransactionData = abi.encodeWithSignature("execute(address,uint256,bytes,bytes32,bytes32)", to, 0, data, predecessor, salt);
 
-        return _getGnosisTransaction(timelockAddressHex, executeTransactionData, isLasts);
+        return _getGnosisTransaction(timelock, executeTransactionData, isLasts);
     }
-
 }

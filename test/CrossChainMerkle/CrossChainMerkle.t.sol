@@ -8,52 +8,41 @@ import {UUPSProxy} from "../../src/UUPSProxy.sol";
 import {MessagingFee, Origin} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
 import {Test} from "forge-std/Test.sol";
 import {CumulativeMerkleCodec} from "../../src/merkle-drop/CumulativeMerkleCodec.sol";
-import {console} from "forge-std/console.sol";
+import "../../script/Utils.sol";
+import "../../utils/GnosisHelpers.sol";
+contract CrossChainMerkle is Test, Utils, GnosisHelpers {
 
-contract CrossChainMerkle is Test {
-    address lrt2 = 0x8F08B70456eb22f6109F57b8fafE862ED28E6040;
-    address lzEndpoint = 0x1a44076050125825900e736c501f859c50fE728c;
-    address oftAdapter = 0x4c8A4521F2431b0aC003829ac4e6dBC4Ed97707d;
-    address kingProtocolOwner = 0xA000244b4a36D57Ea1ECB39b5F02f255e4C8cd52;
-    address cumulativeMerkle = 0x6Db24Ee656843E3fE03eb8762a54D86186bA6B64;
+    address user1 = 0x056590F16D5b314a132BbCFb1283fEc5D5C6E670;
+    uint256 user1CumulativeAmount = 3797650514112974628;
+    address user2 = 0xbCfdB384881C8429D7F7Ab53d6c63366Ea2F5b7C;
+    uint256 user2CumulativeAmount = 3216935016743284;
 
-    address user1 = 0xFB505Aa37508B641CE4D8f066867Db3B3F66185D;
-    uint256 user1CumulativeAmount = 46986201288251449522;
-    address user2 = 0xCB4269C7156C9C18a3ec88353C48000f79eD1359;
-    uint256 user2CumulativeAmount = 25768231672529417;
-
-    bytes32 currentMerkleRoot = 0x1871f7e6db1a66587ef1024b17102d75bfa72d8eb4dfe4d2249a3e19c8511827;
-    uint256 currentBlock = 21896150;
+    bytes32 currentMerkleRoot = 0x5a923cef80009ecf1ce45f9a68449481f0240c14a7926f9b57da70b5dbcd9f7f;
+    uint256 currentBlock = 22117242;
 
     CumulativeMerkleDrop cumulativeMerkleDrop;
 
     bytes32[] proof1;
     bytes32[] proof2;
 
+    ChainConfig mainnetConfig;
+    ChainConfig swellConfig;
     function setUp() public {
-        // create a fork at block 21896150
+        mainnetConfig = getChainConfig("1");
+        swellConfig = getChainConfig("1923");
+
         vm.createSelectFork("https://eth-mainnet.public.blastapi.io", currentBlock);
-        cumulativeMerkleDrop = CumulativeMerkleDrop(payable(cumulativeMerkle));
 
-        vm.startPrank(kingProtocolOwner);
+        executeGnosisTransactionBundle("./output/MainnetMerkleUpgradeTransactions.json", mainnetConfig.owner);
 
-        address cumulativeMerkleDropImpl = address(new CumulativeMerkleDrop(lrt2, lzEndpoint, oftAdapter));
+        cumulativeMerkleDrop = CumulativeMerkleDrop(payable(mainnetConfig.cumulativeMerkleDrop));
 
-        CumulativeMerkleDrop(payable(cumulativeMerkle)).upgradeToAndCall(cumulativeMerkleDropImpl, "");
-
-        cumulativeMerkleDrop.initializeLayerZero(1);
-
-        cumulativeMerkleDrop.addChain(30335, 300_000, toBytes32(cumulativeMerkle));
-
-        IMessageLibManager(lzEndpoint).setConfig(
-            cumulativeMerkle, 
-            0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1, // sendLib 
+        vm.prank(OPERATING_ADMIN_ADDRESS);
+        IMessageLibManager(mainnetConfig.lzEndpoint).setConfig(
+            mainnetConfig.cumulativeMerkleDrop, 
+            mainnetConfig.sendLib, // sendLib 
             getDVNConfig()
         );
-
-        cumulativeMerkleDrop.grantRole(cumulativeMerkleDrop.OPERATING_ADMIN_ROLE(), kingProtocolOwner);
-
-        vm.stopPrank();
 
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/test/CrossChainMerkle/TestMerkleData.json");
@@ -78,7 +67,7 @@ contract CrossChainMerkle is Test {
         vm.prank(user1);
         cumulativeMerkleDrop.updateClaimEid{value: msgFee.nativeFee}(30335, msgFee);
 
-        vm.prank(kingProtocolOwner);
+        vm.prank(mainnetConfig.owner);
         cumulativeMerkleDrop.setUserChainSwitchingEnabled(true);
 
         vm.prank(user1);
@@ -89,7 +78,7 @@ contract CrossChainMerkle is Test {
     }
 
     function test_BatchSwitchChain() public {
-        startHoax(kingProtocolOwner);
+        startHoax(OPERATING_ADMIN_ADDRESS);
         address(cumulativeMerkleDrop).call{value: 1 ether}("");
 
         address[] memory users = new address[](2);
@@ -111,7 +100,7 @@ contract CrossChainMerkle is Test {
 
         address receiver = address(vm.addr(1));
         uint256 balanceBefore = address(receiver).balance;
-        vm.prank(kingProtocolOwner);
+        vm.prank(OPERATING_ADMIN_ADDRESS);
         cumulativeMerkleDrop.sweepETH(payable(receiver), 0.9 ether);
 
         assertEq(receiver.balance, balanceBefore + 0.9 ether);
@@ -121,8 +110,8 @@ contract CrossChainMerkle is Test {
         test_SwitchChain();
 
         bytes memory message = CumulativeMerkleCodec.encodeSingle(user1, cumulativeMerkleDrop.cumulativeClaimed(user1));
-        vm.prank(lzEndpoint);
-        Origin memory origin = Origin({srcEid: 30335, sender: toBytes32(cumulativeMerkle), nonce: 1});
+        vm.prank(mainnetConfig.lzEndpoint);
+        Origin memory origin = Origin({srcEid: 30335, sender: toBytes32(swellConfig.cumulativeMerkleDrop), nonce: 1});
         cumulativeMerkleDrop.lzReceive( origin, bytes32(0x0), message, address(0), abi.encode(1));
 
         test_DefaultClaim();
@@ -141,8 +130,8 @@ contract CrossChainMerkle is Test {
 
         bytes memory message = CumulativeMerkleCodec.encodeBatch(users, amounts);
 
-        vm.prank(lzEndpoint);
-        Origin memory origin = Origin({srcEid: 30335, sender: toBytes32(cumulativeMerkle), nonce: 1});
+        vm.prank(mainnetConfig.lzEndpoint);
+        Origin memory origin = Origin({srcEid: 30335, sender: toBytes32(swellConfig.cumulativeMerkleDrop), nonce: 1});
         cumulativeMerkleDrop.lzReceive(
             origin,
             bytes32(0x0),
@@ -155,7 +144,7 @@ contract CrossChainMerkle is Test {
     }
 
     function test_BroadcastMerkleRoot() public {
-        startHoax(kingProtocolOwner);
+        startHoax(mainnetConfig.owner);
 
         // random merkle root
         bytes32 newMerkleRoot = 0x7465737400000000000000000000000000000000000000000000000000000000;
@@ -170,8 +159,8 @@ contract CrossChainMerkle is Test {
         vm.stopPrank();
 
         bytes memory message = CumulativeMerkleCodec.encodeMerkleRoot(newMerkleRoot);
-        vm.prank(lzEndpoint);
-        Origin memory origin = Origin({srcEid: 30335, sender: toBytes32(cumulativeMerkle), nonce: 1});
+        vm.prank(mainnetConfig.lzEndpoint);
+        Origin memory origin = Origin({srcEid: 30335, sender: toBytes32(swellConfig.cumulativeMerkleDrop), nonce: 1});
         cumulativeMerkleDrop.lzReceive( origin, bytes32(0x0), message, address(0), abi.encode(1));
 
         assertEq(cumulativeMerkleDrop.merkleRoot(), newMerkleRoot);
@@ -180,8 +169,8 @@ contract CrossChainMerkle is Test {
         cumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
 
         // broadcast merkle root to multiple peers
-        vm.startPrank(kingProtocolOwner);
-        cumulativeMerkleDrop.addChain(30184, 300_000, toBytes32(cumulativeMerkle));
+        vm.startPrank(mainnetConfig.owner);
+        cumulativeMerkleDrop.addChain(30184, 300_000, toBytes32(swellConfig.cumulativeMerkleDrop));
 
         vm.expectEmit(true, true, true, true);
         emit CumulativeMerkleDrop.MerkleRootBroadcasted(30335, newMerkleRoot);
@@ -198,65 +187,47 @@ contract CrossChainMerkle is Test {
     }
 
     function test_TopUpPeer() public {
-        startHoax(kingProtocolOwner);
+        startHoax(OPERATING_ADMIN_ADDRESS);
         address(cumulativeMerkleDrop).call{value: 1 ether}("");
 
         cumulativeMerkleDrop.topUpPeer(30335, 10 ether);
     }
 
-    address swellLZEndpoint = 0xcb566e3B6934Fa77258d68ea18E931fa75e1aaAa;
-    address swellKingToken = 0xc2606AADe4bdd978a4fa5a6edb3b66657acEe6F8;
 
     function test_L2Flow() public {
         vm.createSelectFork("https://swell-mainnet.alt.technology");
 
-        startHoax(kingProtocolOwner);
+        startHoax(swellConfig.owner);
 
-        address swellCumulativeMerkleDropImpl = address(new CumulativeMerkleDrop(swellKingToken, swellLZEndpoint, oftAdapter));
-        CumulativeMerkleDrop swellCumulativeMerkleDrop = CumulativeMerkleDrop(payable(address(
-            new UUPSProxy(
-                swellCumulativeMerkleDropImpl,
-                abi.encodeWithSelector(
-                    CumulativeMerkleDrop.initialize.selector,
-                    120,
-                    kingProtocolOwner, 
-                    kingProtocolOwner
-                )
-            )
-        )));
-        swellCumulativeMerkleDrop.initializeLayerZero(1);
-        swellCumulativeMerkleDrop.grantRole(swellCumulativeMerkleDrop.OPERATING_ADMIN_ROLE(), kingProtocolOwner);
-        swellCumulativeMerkleDrop.addChain(30101, 300_000, toBytes32(cumulativeMerkle));
+        // test against the deployed contract
+        CumulativeMerkleDrop swellCumulativeMerkleDrop = CumulativeMerkleDrop(payable(swellConfig.cumulativeMerkleDrop));
 
-        deal(swellKingToken, address(swellCumulativeMerkleDrop), 1000 ether);
+        deal(swellConfig.lrt2Token, address(swellCumulativeMerkleDrop), 1000 ether);
         address(swellCumulativeMerkleDrop).call{value: 1 ether}("");
 
         bytes memory message = CumulativeMerkleCodec.encodeMerkleRoot(currentMerkleRoot);
-        vm.startPrank(swellLZEndpoint);
-        Origin memory origin = Origin({srcEid: 30101, sender: toBytes32(cumulativeMerkle), nonce: 1});
+        vm.startPrank(swellConfig.lzEndpoint);
+        Origin memory origin = Origin({srcEid: 30101, sender: toBytes32(mainnetConfig.cumulativeMerkleDrop), nonce: 1});
         swellCumulativeMerkleDrop.lzReceive(origin, bytes32(0x0), message,address(0), abi.encode(1));
 
         // claim chain should be defaulted to mainnet
         vm.expectRevert(CumulativeMerkleDrop.InvalidChain.selector);
         swellCumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
 
-
-        message = CumulativeMerkleCodec.encodeSingle(user1, 45536101163397729586);
-        origin = Origin({srcEid: 30101, sender: toBytes32(cumulativeMerkle), nonce: 1});
+        message = CumulativeMerkleCodec.encodeSingle(user1, 2797650514112974628);
+        origin = Origin({srcEid: 30101, sender: toBytes32(mainnetConfig.cumulativeMerkleDrop), nonce: 1});
         swellCumulativeMerkleDrop.lzReceive( origin, bytes32(0x0), message, address(0), abi.encode(1));
 
         swellCumulativeMerkleDrop.claim(user1, user1CumulativeAmount, currentMerkleRoot, proof1);
 
-        startHoax(kingProtocolOwner);
+        startHoax(OPERATING_ADMIN_ADDRESS);
 
         swellCumulativeMerkleDrop.topUpPeer(30101, 10 ether);
+
+        swellCumulativeMerkleDrop.setAndBroadcastMerkleRoot(currentMerkleRoot);
     }
 
-    function toBytes32(address addressValue) internal pure returns (bytes32) {
-        return bytes32(uint256(uint160(addressValue)));
-    }
-
-    // Set a base config
+    // Set a base mainnetConfig
     function getDVNConfig() internal pure returns (SetConfigParam[] memory) {
         SetConfigParam[] memory params = new SetConfigParam[](1);
         address[] memory requiredDVNs = new address[](1);
