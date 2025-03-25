@@ -3,6 +3,7 @@ pragma solidity ^0.8.25;
 
 import {CumulativeMerkleDrop} from "../src/merkle-drop/CumulativeMerkleDrop.sol";
 import "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/IMessageLibManager.sol";
+import "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
 import {UUPSProxy} from "../src/UUPSProxy.sol";
 import {Utils, ChainConfig} from "./Utils.sol";
 import {console} from "forge-std/console.sol";
@@ -35,6 +36,10 @@ contract ConfigureL2CumulativeMerkle is Utils {
         }
 
         cumulativeMerkle.grantRole(cumulativeMerkle.OPERATING_ADMIN_ROLE(), OPERATING_ADMIN_ADDRESS);
+
+        cumulativeMerkle.grantRole(cumulativeMerkle.PAUSER_ROLE(), config.cumulativeDropPauser);
+
+        cumulativeMerkle.beginDefaultAdminTransfer(config.cumulativeDropOwner);
 
         vm.stopBroadcast();
     }

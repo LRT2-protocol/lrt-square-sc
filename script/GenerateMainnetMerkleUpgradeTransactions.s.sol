@@ -7,6 +7,7 @@ import {Utils, ChainConfig} from "./Utils.sol";
 import "../utils/GnosisHelpers.sol";
 import "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
 import {UUPSUpgradeable, Initializable} from "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
 contract GenerateMainnetMerkleUpgradeTransactions is Utils, GnosisHelpers {
 
@@ -27,7 +28,11 @@ contract GenerateMainnetMerkleUpgradeTransactions is Utils, GnosisHelpers {
         bytes memory addSwellHexData = abi.encodeWithSelector(CumulativeMerkleDrop.addChain.selector, swellConfig.eid, 170_000, toBytes32(swellConfig.cumulativeMerkleDrop));
         MainnetJson = string.concat(MainnetJson, _getGnosisTransaction(config.cumulativeMerkleDrop, addSwellHexData, false));
 
-        // make canadian ledger the delegate
+        // grant operating admin role to the ledger
+        bytes memory grantOperatingAdminHexData = abi.encodeWithSelector(AccessControlUpgradeable.grantRole.selector, keccak256("OPERATING_ADMIN_ROLE"), OPERATING_ADMIN_ADDRESS);
+        MainnetJson = string.concat(MainnetJson, _getGnosisTransaction(config.cumulativeMerkleDrop, grantOperatingAdminHexData, false));
+
+        // make operating admin ledger the delegate
         bytes memory setDelegateHexData = abi.encodeWithSelector(ILayerZeroEndpointV2.setDelegate.selector, OPERATING_ADMIN_ADDRESS);
         MainnetJson = string.concat(MainnetJson, _getGnosisTransaction(config.cumulativeMerkleDrop, setDelegateHexData, true));
 

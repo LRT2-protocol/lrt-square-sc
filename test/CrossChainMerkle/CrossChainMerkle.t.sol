@@ -44,10 +44,6 @@ contract CrossChainMerkle is Test, Utils, GnosisHelpers {
             getDVNConfig()
         );
 
-        vm.startPrank(mainnetConfig.owner);
-        cumulativeMerkleDrop.grantRole(cumulativeMerkleDrop.OPERATING_ADMIN_ROLE(), mainnetConfig.owner);
-        vm.stopPrank();
-
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/test/CrossChainMerkle/TestMerkleData.json");
         string memory json = vm.readFile(path);
@@ -82,7 +78,7 @@ contract CrossChainMerkle is Test, Utils, GnosisHelpers {
     }
 
     function test_BatchSwitchChain() public {
-        startHoax(mainnetConfig.owner);
+        startHoax(OPERATING_ADMIN_ADDRESS);
         address(cumulativeMerkleDrop).call{value: 1 ether}("");
 
         address[] memory users = new address[](2);
@@ -104,7 +100,7 @@ contract CrossChainMerkle is Test, Utils, GnosisHelpers {
 
         address receiver = address(vm.addr(1));
         uint256 balanceBefore = address(receiver).balance;
-        vm.prank(mainnetConfig.owner);
+        vm.prank(OPERATING_ADMIN_ADDRESS);
         cumulativeMerkleDrop.sweepETH(payable(receiver), 0.9 ether);
 
         assertEq(receiver.balance, balanceBefore + 0.9 ether);
@@ -191,7 +187,7 @@ contract CrossChainMerkle is Test, Utils, GnosisHelpers {
     }
 
     function test_TopUpPeer() public {
-        startHoax(mainnetConfig.owner);
+        startHoax(OPERATING_ADMIN_ADDRESS);
         address(cumulativeMerkleDrop).call{value: 1 ether}("");
 
         cumulativeMerkleDrop.topUpPeer(30335, 10 ether);
