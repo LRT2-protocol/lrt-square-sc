@@ -1,0 +1,13 @@
+{
+  "chainId": "8453",
+  "meta": {
+    "txBuilderVersion": "1.16.5"
+  },
+  "transactions": [
+    {
+      "to": "0x79ed14b41a30215e168d58fe9b6c2266a89765b0",
+      "value": "0",
+      "data": "0xcefc1429"
+    }
+  ]
+}
