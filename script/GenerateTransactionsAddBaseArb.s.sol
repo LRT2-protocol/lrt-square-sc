@@ -32,7 +32,7 @@ contract GenerateTransactionsAddBaseArb is Utils, GnosisHelpers {
 
         vm.writeJson(ArbitrumJson, "./output/ArbitrumAcceptOwnership.json");
 
-        /// set peer transactions {mainnet, swell}s
+        /// set peer transactions {mainnet, swell}
 
         string memory MainnetJson = _getGnosisHeader("1");
 
